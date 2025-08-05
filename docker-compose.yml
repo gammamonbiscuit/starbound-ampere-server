@@ -1,0 +1,12 @@
+services:
+  starbound:
+    image: starbound-ampere-server:local
+    pull_policy: never
+    container_name: starbound
+    user: 1000:1000
+    ports: [21025:21025/tcp]
+    volumes:
+      - ~/.starbound-mods:/server/starbound/mods
+      - ~/.starbound-storage:/server/starbound/storage
+      - ~/starbound.env:/server/starbound.env
+    restart: unless-stopped
