@@ -36,7 +36,8 @@ This [docker-compose.yml](/docker-compose.yml) example only mounts some user ser
 | /server/steamcmd            | SteamCMD and everything used by it                         |
 | /server/starbound/mods      | All .pak mods and workshop mod symlinks                    |
 | /server/starbound/storage   | Save files                                                 |
-| /server/starbound/assets    | The game’s packed.pak                                      |
+| /server/starbound/linux     | Starbound’s dedicated server program                       |
+| /server/starbound/assets    | Starbound’s packed.pak                                     |
 | /server/starbound/steamapps | Workshop mods                                              |
 
 ## Environment Variables
