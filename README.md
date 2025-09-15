@@ -60,13 +60,17 @@ This [docker-compose.yml](/docker-compose.yml) example only mounts some user ser
 
 ## Credits
 Starbound
+
 https://store.steampowered.com/app/211820/Starbound/
 
 OpenStarbound
+
 https://github.com/OpenStarbound/OpenStarbound
 
 ...and to compile OpenStarbound for ARM
+
 https://github.com/OpenStarbound/OpenStarbound/pull/263
 
 Box64
+
 https://github.com/ptitSeb/box64
