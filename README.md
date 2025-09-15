@@ -1,5 +1,5 @@
 # Biscuit's Starbound ARM Dedicated Server Docker
-This is my attempt on running Starbound dedicated server in an Oracle Ampere A1 Compute instance, with Steam workshop mod support.
+This is my attempt on running Starbound dedicated server in an Oracle Ampere A1 Compute instance, with OpenStarbound and Steam workshop mod support.
 
 >[!WARNING]
 >No docker image is available for download, you have to build it yourself,
@@ -11,6 +11,8 @@ This is my attempt on running Starbound dedicated server in an Oracle Ampere A1 
 ```bash
 docker build -t starbound-ampere-server:local .
 ```
+>[!NOTE]
+>This will take a long time to compile, about 33 minutes on my 4-core VM.Standard.A1.Flex instance.
 
 ## Docker Compose
 ```yml
@@ -39,11 +41,13 @@ This [docker-compose.yml](/docker-compose.yml) example only mounts some user ser
 | /server/starbound/linux     | Starbound’s dedicated server program                       |
 | /server/starbound/assets    | Starbound’s packed.pak                                     |
 | /server/starbound/steamapps | Workshop mods                                              |
+| /server/openstarbound       | Pre-compiled OpenStarbound ARM build                       |
 
 ## Environment Variables
 | Variable | Default | Example | Info |
 |:----|:----|:----|:----|
 | `STEAM_LOGIN`           | `"anonymous"` | `"myusername mypassword"` | Your Steam credentials, required to download the game, workshop mods are always downloaded anonymously.                                          |
+| `OPENSTARBOUND`         | `true`        | `false`                   | To use OpenStarbound instead of vanilla Starbound, however you still have to use Steam to download (or provide your own copy of) `packed.pak` .  |
 | `LAUNCH_GAME`           | `true`        | `false`                   | Starbound will be launched after all update operations (if any) are finished.                                                                    |
 | `UPDATE_GAME`           | `false`       | `true`                    | Decides whether to update Starbound or not, if `LAUNCH_GAME` is set to `true` and the game is not found, this option will be ignored.            |
 | `UPDATE_WORKSHOP`       | `false`       | `true`                    | Decides whether to update workshop mods or not, whilst skipping already installed mods.                                                          |
@@ -53,3 +57,15 @@ This [docker-compose.yml](/docker-compose.yml) example only mounts some user ser
 | `WORKSHOP_CHUNK`        | `20`          | `0`                       | Workshop mods are downloaded in groups to avoid downloading a huge list all at once, this option decides the group size, set to `0` to turn off. |
 | `WORKSHOP_PRUNE`        | `true`        | `false`                   | Delete workshop mods that are no longer included in `WORKSHOP_ITEMS` or `WORKSHOP_COLLECTIONS`.                                                  |
 | `WORKSHOP_MAX_RETRY`    | `3`           | `5`                       | Number of retries should be performed when there are errors downloading mods, container will exit after all retries are exhausted.               |
+
+## Credits
+Starbound
+https://store.steampowered.com/app/211820/Starbound/
+
+OpenStarbound
+https://github.com/OpenStarbound/OpenStarbound
+...and to compile OpenStarbound for ARM
+https://github.com/OpenStarbound/OpenStarbound/pull/263
+
+Box64
+https://github.com/ptitSeb/box64

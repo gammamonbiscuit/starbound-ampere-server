@@ -5,17 +5,21 @@ echo "🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫�
 
 if [[ ! -f "/server/starbound.env" ]]; then
     echo "🚧 Creating config file..."
-    tee "/server/starbound1.env" <<EOF >/dev/null
+    tee "/server/starbound.env" <<EOF >/dev/null
 # Your Steam credentials, required to download the game, workshop mods are always downloaded anonymously.
 # Default: "anonymous"
 # Example: "myusername mypassword"
 STEAM_LOGIN="$STEAM_LOGIN"
 
+# Use OpenStarbound instead of the original binaries, however you still have to login to Steam to download the assets.
+# Default: true
+OPENSTARBOUND=$OPENSTARBOUND
+
 # Starbound will be launched after all update operations (if any) are finished.
 # Default: true
 LAUNCH_GAME=$LAUNCH_GAME
 
-# Decides whether to update Starbound or not, if LAUNCH_GAME is set to true and the game is not found, this option will be ignored.
+# Decides whether to update all game files or not, if LAUNCH_GAME is set to true and the game is incomplete, this script will still re-download the missing parts.
 # Default: false
 UPDATE_GAME=$UPDATE_GAME
 
@@ -56,63 +60,141 @@ else
     echo "🚧 Reading config file..."
     source "/server/starbound.env"
 fi
-exit
+
+if [[ $OPENSTARBOUND == true ]]; then
+    echo "🎮 OpenStarbound selected."
+    echo "🎮 https://github.com/OpenStarbound/OpenStarbound"
+else
+    echo "🎮 Official Steam verison selected."
+    echo "🎮 https://store.steampowered.com/app/211820/Starbound/"
+fi
+
 STEAM_SCRIPT_BASE="+@NoPromptForPassword 1 +@sSteamCmdForcePlatformType linux +@sSteamCmdForcePlatformBitness 64 +force_install_dir /server/starbound/"
-mkdir -m 755 -p /server/{steamcmd/home,starbound/{mods,storage,steamapps}}
-if [[ ! -f "/server/steamcmd/linux32/steamcmd" ]]; then
+mkdir -m 755 -p /server/{steamcmd/home,starbound/{assets,mods,storage,logs,steamapps}}
+
+# Update SteamCMD on every launch.
+pushd /server/steamcmd > /dev/null
+if [[ ! -f "linux32/steamcmd" ]]; then
     # Should already exists in the image, just in case the user mounts the steamcmd directory to host.
     echo "🚧 SteamCMD not found, reinstalling..."
-    pushd /server/steamcmd
     curl -L -O "https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz"
-    tar zxvf steamcmd_linux.tar.gz
-    rm steamcmd_linux.tar.gz
-    # For some reason it needs to update again after first run.
-    box64 /server/steamcmd/linux32/steamcmd $STEAM_SCRIPT_BASE +quit >/dev/null
-    box64 /server/steamcmd/linux32/steamcmd $STEAM_SCRIPT_BASE +quit >/dev/null
-    popd
+    tar zxvf "steamcmd_linux.tar.gz"
+    rm "steamcmd_linux.tar.gz"
+    # For some reason it needs to update twice?
+    box64 linux32/steamcmd $STEAM_SCRIPT_BASE +quit >/dev/null
 else
     echo "🚧 Updating SteamCMD..."
-    box64 /server/steamcmd/linux32/steamcmd $STEAM_SCRIPT_BASE +quit >/dev/null
 fi
+box64 linux32/steamcmd $STEAM_SCRIPT_BASE +quit >/dev/null
+find "package" -name "*.zip.*" -delete
+popd > /dev/null
 
 if [[ $UPDATE_GAME == true ]]; then
     echo "🎮 Game update enabled."
+    UPDATE_GAME_BIN=true
+    UPDATE_GAME_PAK_MAIN=true
+    UPDATE_GAME_PAK_OPENSB=true
 else
     echo "🎮 Game update disabled."
     if [[ $LAUNCH_GAME == true ]]; then
-        echo "🎮 Checking if game file exists..."
-        if [[ -f "/server/starbound/linux/starbound_server" ]] && [[ -f "/server/starbound/assets/packed.pak" ]]; then
-            echo "🎮 OK"
+        echo "🎮 Checking if game files exist..."
+        if [[ $OPENSTARBOUND == true ]]; then
+            if [[ -f "/server/starbound/linux/starbound_server" && $(stat -L --printf="%s" "/server/starbound/linux/starbound_server") -gt "40000000" ]]; then
+                echo "✔️ starbound_server"
+                [[ $UPDATE_GAME = true ]] && UPDATE_GAME_BIN=true || UPDATE_GAME_BIN=false
+            else
+                echo "❌ starbound_server"
+                UPDATE_GAME_BIN=true
+            fi
+            if [[ -f "/server/starbound/assets/opensb.pak" ]]; then
+                echo "✔️ opensb.pak"
+                [[ $UPDATE_GAME == true ]] && UPDATE_GAME_PAK_OPENSB=true || UPDATE_GAME_PAK_OPENSB=false
+            else
+                echo "❌ opensb.pak"
+                UPDATE_GAME_PAK_OPENSB=true
+            fi
         else
-            echo "❌ Game not found, update anyways."
-            UPDATE_GAME=true
+            UPDATE_GAME_PAK_OPENSB=false
+            if [[ -f "/server/starbound/linux/starbound_server" && $(stat -L --printf="%s" "/server/starbound/linux/starbound_server") -lt "40000000" ]]; then
+                echo "✔️ starbound_server"
+                [[ $UPDATE_GAME == true ]] && UPDATE_GAME_BIN=true || UPDATE_GAME_BIN=false
+            else
+                echo "❌ starbound_server"
+                UPDATE_GAME_BIN=true
+            fi
+        fi
+        if [[ -f "/server/starbound/assets/packed.pak" ]]; then
+            echo "✔️ packed.pak"
+            [[ $UPDATE_GAME == true ]] && UPDATE_GAME_PAK_MAIN=true || UPDATE_GAME_PAK_MAIN=false
+        else
+            echo "❌ packed.pak"
+            UPDATE_GAME_PAK_MAIN=true
         fi
     fi
 fi
 
-if [[ $UPDATE_GAME == true ]]; then
-    echo "🎮 (Re)installing Starbound..."
-    # Here we only download the depots we need instead of the whole game, without specifying ManifestID Steam will download the latest available version. As a side effect this also prevents Steam from downloading unneeded runtimes.
-    # This is the Linux dedicated server program:
-    #   https://steamdb.info/depot/533833/
-    # And the packed.pak:
-    #   https://steamdb.info/depot/533831/
-    box64 /server/steamcmd/linux32/steamcmd $STEAM_SCRIPT_BASE +login $STEAM_LOGIN +download_depot 533830 533833 +download_depot 533830 533831 +quit
-    if [[ -d "/server/steamcmd/linux32/steamapps/content/app_533830/depot_533831/assets" ]] && [[ -d "/server/steamcmd/linux32/steamapps/content/app_533830/depot_533833/linux" ]]; then
-        # Create the original directory struture so we don't have to modify sbinit.config.
-        mv -f "/server/steamcmd/linux32/steamapps/content/app_533830/depot_533831/assets" "/server/starbound/assets"
-        mv -f "/server/steamcmd/linux32/steamapps/content/app_533830/depot_533833/linux" "/server/starbound/linux"
-        rm -rfv "/server/steamcmd/linux32/steamapps"
-        if [[ -f "/server/starbound/linux/starbound_server" ]] && [[ -f "/server/starbound/assets/packed.pak" ]]; then
-            echo "🎮 Starbound installed."
-        else
-            echo "❌ Failed to install Starbound, abort."
-            exit
+if [[ $UPDATE_GAME_BIN == true || $UPDATE_GAME_PAK_MAIN == true || $UPDATE_GAME_PAK_OPENSB == true ]]; then
+    echo "🎮 (Re)installing misssing parts..."
+    # Need anything from Steam? But skip this part during docker build.
+    if [[ ! $DOCKER_BUILD == true ]]; then
+        if [[ $OPENSTARBOUND == false && $UPDATE_GAME_BIN == true ]] || [[ $UPDATE_GAME_PAK_MAIN == true ]]; then
+            echo "🎮 Downloading files from Steam..."
+            # Here we only download the depots we need instead of the whole game, without specifying ManifestID Steam will download the latest available version. As a side effect this also prevents Steam from downloading unneeded runtimes.
+            # This is the Linux dedicated server program:
+            #   https://steamdb.info/depot/533833/
+            # And the packed.pak:
+            #   https://steamdb.info/depot/533831/
+            box64 /server/steamcmd/linux32/steamcmd $STEAM_SCRIPT_BASE +login $STEAM_LOGIN +download_depot 533830 533833 +download_depot 533830 533831 +quit
+            if [[ -d "/server/steamcmd/linux32/steamapps/content/app_533830/depot_533831/assets" && -d "/server/steamcmd/linux32/steamapps/content/app_533830/depot_533833/linux" ]]; then
+                # Create the original directory struture so we don't have to modify sbinit.config.
+                if [[ $UPDATE_GAME_PAK_MAIN == true ]]; then
+                    rm -fv "/server/starbound/assets/packed.pak"
+                    mv -f "/server/steamcmd/linux32/steamapps/content/app_533830/depot_533831/assets/packed.pak" "/server/starbound/assets/packed.pak"
+                fi
+                if [[ $OPENSTARBOUND == false && $UPDATE_GAME_BIN == true ]]; then
+                    rm -rfv "/server/starbound/linux"
+                    mv -f "/server/steamcmd/linux32/steamapps/content/app_533830/depot_533833/linux" "/server/starbound/linux"
+                fi
+                rm -rfv "/server/steamcmd/linux32/steamapps"
+            else
+                echo "❌ Failed to download from Steam, abort."
+                #exit 1
+            fi
         fi
-    else
-        echo "❌ Failed to install Starbound, abort."
-        exit
     fi
+    # Need anything from OpenStarbound?
+    if [[ $OPENSTARBOUND == true && $UPDATE_GAME_BIN == true ]] || [[ $UPDATE_GAME_PAK_OPENSB == true ]]; then
+        # For now we only use the ARM binaries and assets we built from source until they release an official ARM build.
+        #curl -L -O "https://github.com/OpenStarbound/OpenStarbound/releases/latest/download/OpenStarbound-Linux-Clang-Server.zip"
+        #unzip "OpenStarbound-Linux-Clang-Server.zip"
+        #if [[ -f "/server/server.tar" ]]; then
+        #    tar xvf "server.tar"
+        #    rm -rf "openstarbound"
+        #    mv "server_distribution" "openstarbound"
+        #else
+        #    if [[ -d "/server/openstarbound" ]]; then
+        #        echo "❌ Failed to download from GitHub, use cached copy."
+        #    else
+        #        echo "❌ Failed to download from GitHub, no cached copy, abort."
+        #        exit 1
+        #    fi
+        #fi
+        #rm -f "OpenStarbound-Linux-Clang-Server.zip" "server.tar"
+        echo "🎮 Copying OpenStarbond files from image..."
+        # Same as above, create the original directory struture.
+        if [[ $UPDATE_GAME_PAK_OPENSB == true ]]; then
+            cp -fv "/server/openstarbound/assets/opensb.pak" "/server/starbound/assets/opensb.pak"
+        fi
+        if [[ $OPENSTARBOUND == true && $UPDATE_GAME_BIN == true ]]; then
+            rm -rfv "/server/starbound/linux"
+            cp -rfv "/server/openstarbound/linux" "/server/starbound/linux"
+        fi
+    fi
+fi
+
+# Finish docker build
+if [[ $DOCKER_BUILD == true ]]; then
+    exit
 fi
 
 if [[ $UPDATE_WORKSHOP == true ]]; then
@@ -157,11 +239,11 @@ if [[ $UPDATE_WORKSHOP == true ]]; then
                 echo "      📖 $WORKSHOP_COLLECTIONS_EXPANDED"
             else
                 echo "    ❌ Failed to retrive data, abort."
-                exit
+                exit 1
             fi
         else
             echo "    ❌ Failed to retrive data, abort."
-            exit
+            exit 1
         fi
     else
         echo "  🔧 No workshop collection specified."
@@ -201,7 +283,7 @@ if [[ $UPDATE_WORKSHOP == true ]]; then
             ((LOOP_COUNT++))
             LOOP_TMP_WORKSHOP_ID+=$LOOP_TMP_ITEM,
             LOOP_TMP_WORKSHOP_SCRIPT+="+workshop_download_item 211820 $LOOP_TMP_ITEM validate "
-            if [[ $(($LOOP_COUNT%$WORKSHOP_CHUNK)) == 0 ]] || [[ $LOOP_COUNT == $WORKSHOP_ALL_COUNT ]]; then
+            if [[ $(($LOOP_COUNT%$WORKSHOP_CHUNK)) == 0 || $LOOP_COUNT == $WORKSHOP_ALL_COUNT ]]; then
                 LOOP_TMP_WORKSHOP_ID=${LOOP_TMP_WORKSHOP_ID%*,}
                 LOOP_TEMP_WORKSHOP_SUCCESS=1
                 echo "  🔧 Downloading mod $LOOP_TMP_PREVIOUS_START to $LOOP_COUNT"
@@ -234,7 +316,7 @@ if [[ $UPDATE_WORKSHOP == true ]]; then
                     if [[ $LOOP_TEMP_WORKSHOP_SUCCESS == 0 ]]; then
                         if [[ $LOOP_TEMP_WORKSHOP_RETRY == $WORKSHOP_MAX_RETRY ]]; then
                             echo "  ❌ Failed to download data, abort."
-                            exit
+                            exit 1
                         else
                             echo "  ❌ Download failed, retry $(($LOOP_TEMP_WORKSHOP_RETRY+1))/$WORKSHOP_MAX_RETRY in 30 seconds."
                             LOOP_TMP_WORKSHOP_ID=${LOOP_TMP_WORKSHOP_ID_RETRY%*,}
@@ -259,7 +341,7 @@ if [[ $UPDATE_WORKSHOP == true ]]; then
     if [[ $WORKSHOP_PRUNE == true ]]; then
         echo "  🔧 Deleting old mods..."
         # Will fail if it is already empty, but this is not a breaking error so I just keep it as is.
-        find /server/starbound/steamapps/workshop/content/211820/* -type d | grep -v -E $(echo $WORKSHOP_ALL_ORIGINAL | sed "s/,/\|/g") | xargs -n1 rm -rfv
+        find "/server/starbound/steamapps/workshop/content/211820/*" -type d | grep -v -E $(echo $WORKSHOP_ALL_ORIGINAL | sed "s/,/\|/g") | xargs -n1 rm -rfv
     else
         echo "  🔧 Prune disabled."
     fi
@@ -268,22 +350,32 @@ else
 fi
 
 if [[ $LAUNCH_GAME == true ]]; then
-    echo "  🔧 Recreating workshop symlinks..."
-    rm -rf /server/starbound/mods/workshop-*
-    # Extract parts from .pak path
-    # /server/starbound/steamapps/workshop/content/211820/123456789/foobar.pak
-    #                  (\1                                                   )
-    #                                                     (\2     ) (\3      )
-    # Create Relative source path
-    # ../steamapps/workshop/content/211820/123456789/foobar.pak
-    #   (\1                                                   )
-    # Create Symlink
-    # /server/starbound/mods/workshop-123456789-foobar.pak
-    #                                 (\2     ) (\3      )
-    find /server/starbound/steamapps/workshop/content/211820/ -type f -name "*.pak" | sed -r "s/^\/server\/starbound(.*211820\/([0-9]+)\/(.*))$/\"\.\.\1\" \"\/server\/starbound\/mods\/workshop\-\2\-\3\"/" | xargs -n2 ln -vfs
+    if [[ $OPENSTARBOUND == false && -f "/server/starbound/assets/opensb.pak" ]]; then
+        echo "  🔧 Running Steam version but opensb.pak exists."
+        rm -fv "/server/starbound/assets/opensb.pak"
+    fi
+    if [[ -d "/server/starbound/steamapps/workshop/content/211820" ]]; then
+        echo "  🔧 Recreating workshop symlinks..."
+        rm -rf "/server/starbound/mods/workshop-*"
+        # Extract parts from .pak path
+        # /server/starbound/steamapps/workshop/content/211820/123456789/foobar.pak
+        #                  (\1                                                   )
+        #                                                     (\2     ) (\3      )
+        # Create Relative source path
+        # ../steamapps/workshop/content/211820/123456789/foobar.pak
+        #   (\1                                                   )
+        # Create Symlink
+        # /server/starbound/mods/workshop-123456789-foobar.pak
+        #                                 (\2     ) (\3      )
+        find "/server/starbound/steamapps/workshop/content/211820/" -type f -name "*.pak" | sed -r "s/^\/server\/starbound(.*211820\/([0-9]+)\/(.*))$/\"\.\.\1\" \"\/server\/starbound\/mods\/workshop\-\2\-\3\"/" | xargs -n2 ln -vfs
+    fi
     echo "🎮 Launching Starbound..."
-    cd /server/starbound/linux
-    box64 starbound_server
+    cd "/server/starbound/linux"
+    if [[ $OPENSTARBOUND == true ]]; then
+        ./starbound_server
+    else
+        box64 starbound_server
+    fi
 fi
 
 # Uncomment to keep the container alive for debugging
