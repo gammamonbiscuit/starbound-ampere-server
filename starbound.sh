@@ -158,7 +158,7 @@ if [[ $UPDATE_GAME_BIN == true || $UPDATE_GAME_PAK_MAIN == true || $UPDATE_GAME_
                 rm -rfv "/server/steamcmd/linux32/steamapps"
             else
                 echo "❌ Failed to download from Steam, abort."
-                #exit 1
+                exit 1
             fi
         fi
     fi
