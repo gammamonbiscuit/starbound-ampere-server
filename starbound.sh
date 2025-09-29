@@ -164,22 +164,6 @@ if [[ $UPDATE_GAME_BIN == true || $UPDATE_GAME_PAK_MAIN == true || $UPDATE_GAME_
     fi
     # Need anything from OpenStarbound?
     if [[ $OPENSTARBOUND == true && $UPDATE_GAME_BIN == true ]] || [[ $UPDATE_GAME_PAK_OPENSB == true ]]; then
-        # For now we only use the ARM binaries and assets we built from source until they release an official ARM build.
-        #curl -L -O "https://github.com/OpenStarbound/OpenStarbound/releases/latest/download/OpenStarbound-Linux-Clang-Server.zip"
-        #unzip "OpenStarbound-Linux-Clang-Server.zip"
-        #if [[ -f "/server/server.tar" ]]; then
-        #    tar xvf "server.tar"
-        #    rm -rf "openstarbound"
-        #    mv "server_distribution" "openstarbound"
-        #else
-        #    if [[ -d "/server/openstarbound" ]]; then
-        #        echo "❌ Failed to download from GitHub, use cached copy."
-        #    else
-        #        echo "❌ Failed to download from GitHub, no cached copy, abort."
-        #        exit 1
-        #    fi
-        #fi
-        #rm -f "OpenStarbound-Linux-Clang-Server.zip" "server.tar"
         echo "🎮 Copying OpenStarbond files from image..."
         # Same as above, create the original directory struture.
         if [[ $UPDATE_GAME_PAK_OPENSB == true ]]; then
@@ -341,7 +325,7 @@ if [[ $UPDATE_WORKSHOP == true ]]; then
     if [[ $WORKSHOP_PRUNE == true ]]; then
         echo "  🔧 Deleting old mods..."
         # Will fail if it is already empty, but this is not a breaking error so I just keep it as is.
-        find "/server/starbound/steamapps/workshop/content/211820/*" -type d | grep -v -E $(echo $WORKSHOP_ALL_ORIGINAL | sed "s/,/\|/g") | xargs -n1 rm -rfv
+        find /server/starbound/steamapps/workshop/content/211820/* -type d | grep -v -E $(echo $WORKSHOP_ALL_ORIGINAL | sed "s/,/\|/g") | xargs -n1 rm -rfv
     else
         echo "  🔧 Prune disabled."
     fi
@@ -356,7 +340,7 @@ if [[ $LAUNCH_GAME == true ]]; then
     fi
     if [[ -d "/server/starbound/steamapps/workshop/content/211820" ]]; then
         echo "  🔧 Recreating workshop symlinks..."
-        rm -rf "/server/starbound/mods/workshop-*"
+        rm -rfv /server/starbound/mods/workshop-*
         # Extract parts from .pak path
         # /server/starbound/steamapps/workshop/content/211820/123456789/foobar.pak
         #                  (\1                                                   )
@@ -367,7 +351,7 @@ if [[ $LAUNCH_GAME == true ]]; then
         # Create Symlink
         # /server/starbound/mods/workshop-123456789-foobar.pak
         #                                 (\2     ) (\3      )
-        find "/server/starbound/steamapps/workshop/content/211820/" -type f -name "*.pak" | sed -r "s/^\/server\/starbound(.*211820\/([0-9]+)\/(.*))$/\"\.\.\1\" \"\/server\/starbound\/mods\/workshop\-\2\-\3\"/" | xargs -n2 ln -vfs
+        find /server/starbound/steamapps/workshop/content/211820/ -type f -name "*.pak" | sed -r "s/^\/server\/starbound(.*211820\/([0-9]+)\/(.*))$/\"\.\.\1\" \"\/server\/starbound\/mods\/workshop\-\2\-\3\"/" | xargs -n2 ln -vfs
     fi
     echo "🎮 Launching Starbound..."
     cd "/server/starbound/linux"
