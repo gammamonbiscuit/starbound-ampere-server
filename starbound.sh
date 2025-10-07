@@ -356,12 +356,12 @@ if [[ $LAUNCH_GAME == true ]]; then
     echo "🎮 Launching Starbound..."
     cd "/server/starbound/linux"
     if [[ $OPENSTARBOUND == true ]]; then
-        ./starbound_server
+        exec ./starbound_server
     else
-        box64 starbound_server
+        exec box64 starbound_server
     fi
+else
+    echo "👋 Adios"
+    # Uncomment to keep the container alive for debugging
+    #sleep infinity
 fi
-
-# Uncomment to keep the container alive for debugging
-echo "👋 Adios"
-#sleep infinity
