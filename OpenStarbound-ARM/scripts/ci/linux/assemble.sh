@@ -9,6 +9,8 @@ mkdir server_distribution/linux
 cp \
   dist/starbound_server \
   dist/btree_repacker \
+  dist/asset_packer \
+  dist/asset_unpacker \
   scripts/ci/linux/run-server.sh \
   scripts/ci/linux/sbinit.config \
   scripts/steam_appid.txt \
