@@ -55,7 +55,7 @@ RUN --mount=type=cache,sharing=locked,target=/var/cache/apt \
     --mount=type=cache,sharing=locked,target=/var/lib/apt \
     --mount=type=cache,sharing=locked,target=/var/cache/debconf \
     apt update && \
-    apt install -y --no-install-recommends curl jq ca-certificates dumb-init
+    apt install -y --no-install-recommends curl jq ca-certificates
 RUN mkdir -m 755 -p /server/{steamcmd/home,starbound/{assets,mods,storage,logs,steamapps}} && \
     groupadd -g 1000 steam && \
     useradd -u 1000 -g steam -d /server/steamcmd/home steam && \
@@ -67,5 +67,6 @@ COPY --chown=steam:steam --chmod=755 --from=builder /output/openstarbound /serve
 COPY --chown=steam:steam --chmod=755 starbound.sh starbound.env /server/
 #RUN /server/starbound.sh # To include SteamCMD and OpenStarbound components in /server
 EXPOSE 21025/tcp
-ENTRYPOINT ["/usr/bin/dumb-init", "--"]
+STOPSIGNAL SIGINT
+ENTRYPOINT ["/bin/bash", "-c"]
 CMD ["/server/starbound.sh"]
