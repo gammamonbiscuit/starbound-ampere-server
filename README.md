@@ -12,7 +12,7 @@ This is my attempt on running Starbound dedicated server in an Oracle Ampere A1 
 docker build -t starbound-ampere-server:local .
 ```
 >[!NOTE]
->This will take a long time to compile, about 33 minutes on my 4-core VM.Standard.A1.Flex instance.
+>This will take a long time to compile, about 33 minutes on my 4-core VM.Standard.A1.Flex instance. When building for `linux/amd64` it just downloads OpenStarbound's [release assets](https://github.com/OpenStarbound/OpenStarbound/releases), if an `linux/arm64` build become avialable from them in the future, I will use that too instead of compiling everything.
 
 ## Docker Compose
 ```yml
