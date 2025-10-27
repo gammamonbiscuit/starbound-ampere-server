@@ -1,37 +1,78 @@
 FROM debian:trixie-slim AS builder
+
 SHELL ["/bin/bash", "-c"]
+
+ARG TARGETPLATFORM
 ARG DEBIAN_FRONTEND=noninteractive \
     VCPKG_ROOT=/compile/vcpkg \
     OPENSTARBOUND_VERSION=v0.1.14
+
 COPY OpenStarbound-ARM /OpenStarbound-ARM
+
 RUN --mount=type=cache,sharing=locked,target=/var/cache/apt \
     --mount=type=cache,sharing=locked,target=/var/lib/apt \
     --mount=type=cache,sharing=locked,target=/var/cache/debconf \
     apt update && \
-    apt install -y curl ca-certificates zip unzip tar git build-essential cmake pkg-config libxmu-dev libxi-dev libgl-dev libglu1-mesa-dev libsdl2-dev python3-jinja2 ninja-build autoconf automake autoconf-archive libltdl-dev && \
-    mkdir -p /{compile,output}
+    apt install -y curl ca-certificates zip unzip tar git && \
+    if [[ "$TARGETPLATFORM" == "linux/arm64" ]]; then \
+        apt install -y build-essential cmake pkg-config libxmu-dev libxi-dev libgl-dev libglu1-mesa-dev libsdl2-dev python3-jinja2 ninja-build autoconf automake autoconf-archive libltdl-dev; \
+    fi
+
+RUN mkdir -p /{compile,output/box64}
 WORKDIR /compile
-RUN git clone --depth 1 https://github.com/ptitSeb/box64.git && \
-    cd /compile/box64 && \
-    cmake . -D ADLINK=1 -D ARM_DYNAREC=ON -D BOX32=ON -D BOX32_BINFMT=ON -D CMAKE_BUILD_TYPE=Release && \
-    make -j$(nproc) && \
-    make install DESTDIR=/output/box64
-RUN git clone --depth 1 https://github.com/microsoft/vcpkg.git && \
-    cd /compile/vcpkg && \
-    ./bootstrap-vcpkg.sh -disableMetrics
-RUN git clone --depth 1 --branch ${OPENSTARBOUND_VERSION} https://github.com/OpenStarbound/OpenStarbound.git && \
-    cp -R /OpenStarbound-ARM/. /compile/OpenStarbound/ && \
-    cd /compile/OpenStarbound/source && \
-    cmake --preset=linux-arm-release
-RUN cd /compile/OpenStarbound/build/linux-arm-release && \
-    cmake --build . --parallel $(nproc) && \
-    cd /compile/OpenStarbound && \
-    ./scripts/ci/linux/assemble.sh && \
-    mv server_distribution /output/openstarbound
+
+RUN if [[ "$TARGETPLATFORM" == "linux/arm64" ]]; then \
+        git clone --depth 1 https://github.com/ptitSeb/box64.git && \
+        cd /compile/box64 && \
+        cmake . -D ADLINK=1 -D ARM_DYNAREC=ON -D BOX32=ON -D BOX32_BINFMT=ON -D CMAKE_BUILD_TYPE=Release && \
+        make -j$(nproc) && \
+        make install DESTDIR=/output/box64; \
+    fi
+
+RUN if [[ "$TARGETPLATFORM" == "linux/arm64" ]]; then \
+        git clone --depth 1 https://github.com/microsoft/vcpkg.git && \
+        cd /compile/vcpkg && \
+        ./bootstrap-vcpkg.sh -disableMetrics; \
+    fi
+
+RUN if [[ "$TARGETPLATFORM" == "linux/arm64" ]]; then \
+        git clone --depth 1 --branch ${OPENSTARBOUND_VERSION} https://github.com/OpenStarbound/OpenStarbound.git && \
+        cp -R /OpenStarbound-ARM/. /compile/OpenStarbound/ && \
+        cd /compile/OpenStarbound/source && \
+        cmake --preset=linux-arm-release; \
+    fi
+
+RUN if [[ "$TARGETPLATFORM" == "linux/arm64" ]]; then \
+        cd /compile/OpenStarbound/build/linux-arm-release && \
+        cmake --build . --parallel $(nproc) && \
+        cd /compile/OpenStarbound && \
+        ./scripts/ci/linux/assemble.sh && \
+        mv server_distribution /output/openstarbound; \
+    elif [[ "$TARGETPLATFORM" == "linux/amd64" ]]; then \
+        curl -L -O "https://github.com/OpenStarbound/OpenStarbound/releases/download/${OPENSTARBOUND_VERSION}/OpenStarbound-Linux-Clang-Server.zip" && \
+        unzip "OpenStarbound-Linux-Clang-Server.zip" && \
+        curl -L -O "https://github.com/OpenStarbound/OpenStarbound/releases/download/${OPENSTARBOUND_VERSION}/OpenStarbound-Linux-Clang-Client.zip" && \
+        unzip "OpenStarbound-Linux-Clang-Client.zip" && \
+        if [[ -f "server.tar" && -f "client.tar" ]]; then \
+            tar xvf "server.tar" && \
+            tar xvf "client.tar" && \
+            mv server_distribution /output/openstarbound && \
+            mv client_distribution/linux/asset_packer /output/openstarbound/linux/asset_packer && \
+            mv client_distribution/linux/asset_unpacker /output/openstarbound/linux/asset_unpacker && \
+            rm /output/openstarbound/mods/mods_go_here; \
+        else \
+            exit 1; \
+        fi \
+    else \
+        exit 1; \
+    fi
 
 FROM debian:trixie-slim
+
 SHELL ["/bin/bash", "-c"]
-ARG DOCKER_BUILD=true
+
+ARG TARGETPLATFORM \
+    DOCKER_BUILD=true
 ENV BOX64_LOG=0 \
     BOX64_NOBANNER=1 \
     STEAM_LOGIN="anonymous" \
@@ -51,20 +92,31 @@ ENV BOX64_LOG=0 \
     BOX64_DYNAREC_FASTROUND=1 \
     BOX64_DYNAREC_FASTNAN=1 \
     BOX64_DYNAREC_X87DOUBLE=0
+
 RUN --mount=type=cache,sharing=locked,target=/var/cache/apt \
     --mount=type=cache,sharing=locked,target=/var/lib/apt \
     --mount=type=cache,sharing=locked,target=/var/cache/debconf \
     apt update && \
-    apt install -y --no-install-recommends curl jq ca-certificates
+    apt install -y --no-install-recommends curl jq ca-certificates && \
+    if [[ "$TARGETPLATFORM" == "linux/amd64" ]]; then \
+        apt install -y --no-install-recommends lib32stdc++6; \
+    fi
+
 RUN mkdir -m 755 -p /server/{steamcmd/home,starbound/{assets,mods,storage,logs,steamapps}} && \
     groupadd -g 1000 steam && \
     useradd -u 1000 -g steam -d /server/steamcmd/home steam && \
     chown -R steam:steam /server
+
 USER steam
 WORKDIR /server
 COPY --chown=root:root   --chmod=755 --from=builder  /output/box64 /
 COPY --chown=steam:steam --chmod=755 --from=builder /output/openstarbound /server/openstarbound
 COPY --chown=steam:steam --chmod=755 starbound.sh starbound.env /server/
+
+RUN if [[ "$TARGETPLATFORM" == "linux/amd64" ]]; then \
+        sed -ir "s/box64\s/\.\//g" /server/starbound.sh && \
+        sed -ir "s/\sARM\s/ x86 /g" /server/starbound.sh; \
+    fi
 #RUN /server/starbound.sh # To include SteamCMD and OpenStarbound components in /server
 EXPOSE 21025/tcp
 STOPSIGNAL SIGINT

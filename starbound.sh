@@ -144,7 +144,7 @@ if [[ $UPDATE_GAME_BIN == true || $UPDATE_GAME_PAK_MAIN == true || $UPDATE_GAME_
             #   https://steamdb.info/depot/533833/
             # And the packed.pak:
             #   https://steamdb.info/depot/533831/
-            box64 /server/steamcmd/linux32/steamcmd $STEAM_SCRIPT_BASE +login $STEAM_LOGIN +download_depot 533830 533833 +download_depot 533830 533831 +quit
+            box64 steamcmd/linux32/steamcmd $STEAM_SCRIPT_BASE +login $STEAM_LOGIN +download_depot 533830 533833 +download_depot 533830 533831 +quit
             if [[ -d "/server/steamcmd/linux32/steamapps/content/app_533830/depot_533831/assets" && -d "/server/steamcmd/linux32/steamapps/content/app_533830/depot_533833/linux" ]]; then
                 # Create the original directory struture so we don't have to modify sbinit.config.
                 if [[ $UPDATE_GAME_PAK_MAIN == true ]]; then
@@ -275,7 +275,7 @@ if [[ $UPDATE_WORKSHOP == true ]]; then
                 # This will loop 1+WORKSHOP_MAX_RETRY times.
                 for ((LOOP_TEMP_WORKSHOP_RETRY = 0 ; LOOP_TEMP_WORKSHOP_RETRY <= WORKSHOP_MAX_RETRY ; LOOP_TEMP_WORKSHOP_RETRY++ )); do
                     rm -f "/server/steamcmd/home/Steam/logs/workshop_log.txt"
-                    box64 /server/steamcmd/linux32/steamcmd $STEAM_SCRIPT_BASE +login anonymous $LOOP_TMP_WORKSHOP_SCRIPT +quit >/dev/null
+                    box64 steamcmd/linux32/steamcmd $STEAM_SCRIPT_BASE +login anonymous $LOOP_TMP_WORKSHOP_SCRIPT +quit >/dev/null
                     # Sometimes SteamCMD can't even launch normally, if that's the case don't bother checking every mods and finish this loop right here.
                     if [[ ! -f "/server/steamcmd/home/Steam/logs/workshop_log.txt" ]]; then
                         echo "  ❌ Unable to download anything, retry $(($LOOP_TEMP_WORKSHOP_RETRY+1))/$WORKSHOP_MAX_RETRY in 30 seconds."
