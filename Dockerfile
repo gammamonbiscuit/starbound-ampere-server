@@ -1,25 +1,35 @@
-FROM debian:trixie-slim AS builder
+FROM debian:trixie-slim AS base
 
 SHELL ["/bin/bash", "-c"]
 
-ARG TARGETPLATFORM
-ARG DEBIAN_FRONTEND=noninteractive \
+ARG TARGETPLATFORM \
+    DOCKER_BUILD=true \
+    DEBIAN_FRONTEND=noninteractive \
     VCPKG_ROOT=/compile/vcpkg \
     OPENSTARBOUND_VERSION=v0.1.14
+
+RUN --mount=type=cache,sharing=locked,target=/var/cache/apt \
+    --mount=type=cache,sharing=locked,target=/var/lib/apt \
+    --mount=type=cache,sharing=locked,target=/var/cache/debconf \
+    apt update && \
+    apt install -y --no-install-recommends curl ca-certificates zip unzip tar git $([[ "$TARGETPLATFORM" == "linux/amd64" ]] && echo "lib32stdc++6")
+
+FROM base AS builder
 
 COPY OpenStarbound-ARM /OpenStarbound-ARM
 
 RUN --mount=type=cache,sharing=locked,target=/var/cache/apt \
     --mount=type=cache,sharing=locked,target=/var/lib/apt \
     --mount=type=cache,sharing=locked,target=/var/cache/debconf \
-    apt update && \
-    apt install -y curl ca-certificates zip unzip tar git && \
     if [[ "$TARGETPLATFORM" == "linux/arm64" ]]; then \
         apt install -y build-essential cmake pkg-config libxmu-dev libxi-dev libgl-dev libglu1-mesa-dev libsdl2-dev python3-jinja2 ninja-build autoconf automake autoconf-archive libltdl-dev; \
     fi
 
 RUN mkdir -p /{compile,output/box64}
+
 WORKDIR /compile
+
+FROM builder AS builder-box64
 
 RUN if [[ "$TARGETPLATFORM" == "linux/arm64" ]]; then \
         git clone --depth 1 https://github.com/ptitSeb/box64.git && \
@@ -28,6 +38,8 @@ RUN if [[ "$TARGETPLATFORM" == "linux/arm64" ]]; then \
         make -j$(nproc) && \
         make install DESTDIR=/output/box64; \
     fi
+
+FROM builder AS builder-osb
 
 RUN if [[ "$TARGETPLATFORM" == "linux/arm64" ]]; then \
         git clone --depth 1 https://github.com/microsoft/vcpkg.git && \
@@ -48,7 +60,9 @@ RUN if [[ "$TARGETPLATFORM" == "linux/arm64" ]]; then \
         cd /compile/OpenStarbound && \
         ./scripts/ci/linux/assemble.sh && \
         mv server_distribution /output/openstarbound; \
-    elif [[ "$TARGETPLATFORM" == "linux/amd64" ]]; then \
+    fi
+
+RUN if [[ "$TARGETPLATFORM" == "linux/amd64" ]]; then \
         curl -L -O "https://github.com/OpenStarbound/OpenStarbound/releases/download/${OPENSTARBOUND_VERSION}/OpenStarbound-Linux-Clang-Server.zip" && \
         unzip "OpenStarbound-Linux-Clang-Server.zip" && \
         curl -L -O "https://github.com/OpenStarbound/OpenStarbound/releases/download/${OPENSTARBOUND_VERSION}/OpenStarbound-Linux-Clang-Client.zip" && \
@@ -63,16 +77,10 @@ RUN if [[ "$TARGETPLATFORM" == "linux/arm64" ]]; then \
         else \
             exit 1; \
         fi \
-    else \
-        exit 1; \
     fi
 
-FROM debian:trixie-slim
+FROM base AS final
 
-SHELL ["/bin/bash", "-c"]
-
-ARG TARGETPLATFORM \
-    DOCKER_BUILD=true
 ENV BOX64_LOG=0 \
     BOX64_NOBANNER=1 \
     STEAM_LOGIN="anonymous" \
@@ -93,15 +101,6 @@ ENV BOX64_LOG=0 \
     BOX64_DYNAREC_FASTNAN=1 \
     BOX64_DYNAREC_X87DOUBLE=0
 
-RUN --mount=type=cache,sharing=locked,target=/var/cache/apt \
-    --mount=type=cache,sharing=locked,target=/var/lib/apt \
-    --mount=type=cache,sharing=locked,target=/var/cache/debconf \
-    apt update && \
-    apt install -y --no-install-recommends curl jq ca-certificates && \
-    if [[ "$TARGETPLATFORM" == "linux/amd64" ]]; then \
-        apt install -y --no-install-recommends lib32stdc++6; \
-    fi
-
 RUN mkdir -m 755 -p /server/{steamcmd/home,starbound/{assets,mods,storage,logs,steamapps}} && \
     groupadd -g 1000 steam && \
     useradd -u 1000 -g steam -d /server/steamcmd/home steam && \
@@ -109,8 +108,8 @@ RUN mkdir -m 755 -p /server/{steamcmd/home,starbound/{assets,mods,storage,logs,s
 
 USER steam
 WORKDIR /server
-COPY --chown=root:root   --chmod=755 --from=builder  /output/box64 /
-COPY --chown=steam:steam --chmod=755 --from=builder /output/openstarbound /server/openstarbound
+COPY --chown=root:root   --chmod=755 --from=builder-box64  /output/box64 /
+COPY --chown=steam:steam --chmod=755 --from=builder-osb    /output/openstarbound /server/openstarbound
 COPY --chown=steam:steam --chmod=755 starbound.sh starbound.env /server/
 
 RUN if [[ "$TARGETPLATFORM" == "linux/amd64" ]]; then \
