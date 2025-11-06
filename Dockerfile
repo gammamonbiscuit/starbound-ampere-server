@@ -86,6 +86,10 @@ ENV BOX64_LOG=0 \
     STEAM_LOGIN="anonymous" \
     OPENSTARBOUND=true \
     LAUNCH_GAME=true \
+    BACKUP_ENABLED=true \
+    BACKUP_VERSIONS=10 \
+    BACKUP_MODS_MANUAL=false \
+    BACKUP_MODS_WORKSHOP=false \
     UPDATE_GAME=false \
     UPDATE_WORKSHOP=false \
     UPDATE_WORKSHOP_FORCE=false \
@@ -101,7 +105,7 @@ ENV BOX64_LOG=0 \
     BOX64_DYNAREC_FASTNAN=1 \
     BOX64_DYNAREC_X87DOUBLE=0
 
-RUN mkdir -m 755 -p /server/{steamcmd/home,starbound/{assets,mods,storage,logs,steamapps}} && \
+RUN mkdir -m 755 -p /server/{backup,steamcmd/home,starbound/{assets,mods,storage,logs,steamapps}} && \
     groupadd -g 1000 steam && \
     useradd -u 1000 -g steam -d /server/steamcmd/home steam && \
     chown -R steam:steam /server

@@ -19,6 +19,22 @@ OPENSTARBOUND=$OPENSTARBOUND
 # Default: true
 LAUNCH_GAME=$LAUNCH_GAME
 
+# Backup save data on start, before any update and game launch.
+# Default: true
+BACKUP_ENABLED=$BACKUP_ENABLED
+
+# Decides how many copies of backup data will be kept.
+# Default: 10
+BACKUP_VERSIONS=$BACKUP_VERSIONS
+
+# Include manual mods in backup.
+# Default: false
+BACKUP_MODS_MANUAL=$BACKUP_MODS_MANUAL
+
+# Include workshop mods in backup.
+# Default: false
+BACKUP_MODS_WORKSHOP=$BACKUP_MODS_WORKSHOP
+
 # Decides whether to update all game files or not, if LAUNCH_GAME is set to true and the game is incomplete, this script will still re-download the missing parts.
 # Default: false
 UPDATE_GAME=$UPDATE_GAME
@@ -61,6 +77,8 @@ else
     source "/server/starbound.env"
 fi
 
+mkdir -m 755 -p /server/{backup,steamcmd/home,starbound/{assets,mods,storage,logs,steamapps}}
+
 if [[ $OPENSTARBOUND == true ]]; then
     echo "🎮 OpenStarbound selected."
     echo "🎮 https://github.com/OpenStarbound/OpenStarbound"
@@ -69,10 +87,29 @@ else
     echo "🎮 https://store.steampowered.com/app/211820/Starbound/"
 fi
 
-STEAM_SCRIPT_BASE="+@NoPromptForPassword 1 +@sSteamCmdForcePlatformType linux +@sSteamCmdForcePlatformBitness 64 +force_install_dir /server/starbound/"
-mkdir -m 755 -p /server/{steamcmd/home,starbound/{assets,mods,storage,logs,steamapps}}
+# Backup save data on start.
+if [[ $BACKUP_ENABLED == true ]]; then
+    echo "💾 Backup enabled."
+    BACKUP_NEWFILE="/server/backup/universe_$(date +%s).zip"
+    pushd /server/starbound > /dev/null
+    echo "  📁 Save file"
+    zip $BACKUP_NEWFILE -9or "./storage" -x "*/starbound_server.log.*"
+    if [[ $BACKUP_MODS_MANUAL == true ]]; then
+        echo "  📁 Manual mods"
+        zip $BACKUP_NEWFILE -9uor "./mods" -i "*.pak" -x "*/workshop-*.pak"
+    fi
+    if [[ $BACKUP_MODS_WORKSHOP == true ]]; then
+        echo "  📁 Workshop mods"
+        zip $BACKUP_NEWFILE -9uor "./mods" -i "*/workshop-*.pak"
+    fi
+    popd > /dev/null
+    find /server/backup -type f | grep -E "\/universe_[0-9]{10}.zip$" | sort | head -n -$BACKUP_VERSIONS | xargs -n1 rm -fv
+else
+    echo "💾 Backup disabled."
+fi
 
 # Update SteamCMD on every launch.
+STEAM_SCRIPT_BASE="+@NoPromptForPassword 1 +@sSteamCmdForcePlatformType linux +@sSteamCmdForcePlatformBitness 64 +force_install_dir /server/starbound/"
 pushd /server/steamcmd > /dev/null
 if [[ ! -f "linux32/steamcmd" ]]; then
     # Should already exists in the image, just in case the user mounts the steamcmd directory to host.
@@ -338,9 +375,10 @@ if [[ $LAUNCH_GAME == true ]]; then
         echo "  🔧 Running Steam version but opensb.pak exists."
         rm -fv "/server/starbound/assets/opensb.pak"
     fi
+    echo "  🔧 Removing invalid workshop symlinks..."
+    find /server/starbound/mods/workshop-* -xtype l -delete
     if [[ -d "/server/starbound/steamapps/workshop/content/211820" ]]; then
         echo "  🔧 Recreating workshop symlinks..."
-        rm -rfv /server/starbound/mods/workshop-*
         # Extract parts from .pak path
         # /server/starbound/steamapps/workshop/content/211820/123456789/foobar.pak
         #                  (\1                                                   )

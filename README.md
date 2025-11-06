@@ -26,6 +26,7 @@ services:
     volumes:
       - ~/.starbound-mods:/server/starbound/mods
       - ~/.starbound-storage:/server/starbound/storage
+      - ~/.starbound-backup:/server/backup
       - ~/starbound.env:/server/starbound.env
     restart: unless-stopped
 ```
@@ -42,6 +43,7 @@ This [docker-compose.yml](/docker-compose.yml) example only mounts some user ser
 | /server/starbound/assets    | Starbound’s packed.pak                                     |
 | /server/starbound/steamapps | Workshop mods                                              |
 | /server/openstarbound       | Pre-compiled OpenStarbound ARM build                       |
+| /server/backup              | Backup data                                                |
 
 ## Environment Variables
 | Variable | Default | Example | Info |
@@ -49,6 +51,10 @@ This [docker-compose.yml](/docker-compose.yml) example only mounts some user ser
 | `STEAM_LOGIN`           | `"anonymous"` | `"myusername mypassword"` | Your Steam credentials, required to download the game, workshop mods are always downloaded anonymously.                                                               |
 | `OPENSTARBOUND`         | `true`        | `false`                   | To use OpenStarbound instead of vanilla Starbound, however you still have to use Steam to download (or provide your own copy of) `packed.pak` .                       |
 | `LAUNCH_GAME`           | `true`        | `false`                   | Starbound will be launched after all update operations (if any) are finished.                                                                                         |
+| `BACKUP_ENABLED`        | `true`        | `false`                   | Backup save data on start, before any update and game launch.                                                                                                         |
+| `BACKUP_VERSIONS`       | `10`          | `5`                       | Decides how many copies of backup data will be kept.                                                                                                                  |
+| `BACKUP_MODS_MANUAL`    | `false`       | `true`                    | Include manual mods in backup.                                                                                                                                        |
+| `BACKUP_MODS_WORKSHOP`  | `false`       | `true`                    | Include workshop mods in backup.                                                                                                                                      |
 | `UPDATE_GAME`           | `false`       | `true`                    | Decides whether to update all game files or not, if `LAUNCH_GAME` is set to `true` and the game is incomplete, this script will still re-download the missing parts.  |
 | `UPDATE_WORKSHOP`       | `false`       | `true`                    | Decides whether to update workshop mods or not, whilst skipping already installed mods.                                                                               |
 | `UPDATE_WORKSHOP_FORCE` | `false`       | `true`                    | Changes `UPDATE_WORKSHOP` behaviour to verify and download every workshop mods if needed.                                                                             |
