@@ -27,6 +27,10 @@ BACKUP_ENABLED=$BACKUP_ENABLED
 # Default: 10
 BACKUP_VERSIONS=$BACKUP_VERSIONS
 
+# Number of seconds that must be passed before a backup task can run again, this is to prevent backups being overwritten by broken repeatedly restarting container.
+# Default: 1800
+BACKUP_COOLDOWN=$BACKUP_COOLDOWN
+
 # Include manual mods in backup.
 # Default: false
 BACKUP_MODS_MANUAL=$BACKUP_MODS_MANUAL
@@ -90,20 +94,26 @@ fi
 # Backup save data on start.
 if [[ $BACKUP_ENABLED == true ]]; then
     echo "💾 Backup enabled."
-    BACKUP_NEWFILE="/server/backup/universe_$(date +%s).zip"
-    pushd /server/starbound > /dev/null
-    echo "  📁 Save file"
-    zip $BACKUP_NEWFILE -9or "./storage" -x "*/starbound_server.log.*"
-    if [[ $BACKUP_MODS_MANUAL == true ]]; then
-        echo "  📁 Manual mods"
-        zip $BACKUP_NEWFILE -9uor "./mods" -i "*.pak" -x "*/workshop-*.pak"
+    BACKUP_LATEST=$(find /server/backup -type f | grep -E "\/universe_[0-9]{10}.zip$" | sort -r | head -1 | sed -r "s/.*\/universe_([0-9]{10}).zip$/\1/g")
+    BACKUP_COOLNESS=$(($(date +%s) - ${BACKUP_LATEST:-0}))
+    if [[ $BACKUP_COOLNESS -lt $BACKUP_COOLDOWN ]]; then
+        echo "  ❌ There are archive(s) younger than $BACKUP_COOLDOWN seconds ($BACKUP_COOLNESS s), skipping backup task."
+    else
+        BACKUP_NEWFILE="/server/backup/universe_$(date +%s).zip"
+        pushd /server/starbound > /dev/null
+        echo "  📁 Save file"
+        zip $BACKUP_NEWFILE -9or "./storage" -x "*/starbound_server.log.*"
+        if [[ $BACKUP_MODS_MANUAL == true ]]; then
+            echo "  📁 Manual mods"
+            zip $BACKUP_NEWFILE -9uor "./mods" -i "*.pak" -x "*/workshop-*.pak"
+        fi
+        if [[ $BACKUP_MODS_WORKSHOP == true ]]; then
+            echo "  📁 Workshop mods"
+            zip $BACKUP_NEWFILE -9uor "./mods" -i "*/workshop-*.pak"
+        fi
+        popd > /dev/null
+        find /server/backup -type f | grep -E "\/universe_[0-9]{10}.zip$" | sort | head -n -$BACKUP_VERSIONS | xargs -n1 rm -fv
     fi
-    if [[ $BACKUP_MODS_WORKSHOP == true ]]; then
-        echo "  📁 Workshop mods"
-        zip $BACKUP_NEWFILE -9uor "./mods" -i "*/workshop-*.pak"
-    fi
-    popd > /dev/null
-    find /server/backup -type f | grep -E "\/universe_[0-9]{10}.zip$" | sort | head -n -$BACKUP_VERSIONS | xargs -n1 rm -fv
 else
     echo "💾 Backup disabled."
 fi
