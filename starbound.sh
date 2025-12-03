@@ -39,6 +39,10 @@ BACKUP_MODS_MANUAL=$BACKUP_MODS_MANUAL
 # Default: false
 BACKUP_MODS_WORKSHOP=$BACKUP_MODS_WORKSHOP
 
+# Decides whether to update SteamCMD or not, if UPDATE_GAME or UPDATE_WORKSHOP is set to true this option will be ignored.
+# Default: false
+UPDATE_STEAM=$UPDATE_STEAM
+
 # Decides whether to update all game files or not, if LAUNCH_GAME is set to true and the game is incomplete, this script will still re-download the missing parts.
 # Default: false
 UPDATE_GAME=$UPDATE_GAME
@@ -118,23 +122,26 @@ else
     echo "💾 Backup disabled."
 fi
 
-# Update SteamCMD on every launch.
+# Update SteamCMD on launch if needed.
 STEAM_SCRIPT_BASE="+@NoPromptForPassword 1 +@sSteamCmdForcePlatformType linux +@sSteamCmdForcePlatformBitness 64 +force_install_dir /server/starbound/"
-pushd /server/steamcmd > /dev/null
-if [[ ! -f "linux32/steamcmd" ]]; then
-    # Should already exists in the image, just in case the user mounts the steamcmd directory to host.
-    echo "🚧 SteamCMD not found, reinstalling..."
-    curl -L -O "https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz"
-    tar zxvf "steamcmd_linux.tar.gz"
-    rm "steamcmd_linux.tar.gz"
-    # For some reason it needs to update twice?
+if [[ $UPDATE_STEAM == true || $UPDATE_GAME == true || $UPDATE_WORKSHOP == true ]]; then
+    pushd /server/steamcmd > /dev/null
+    if [[ ! -f "linux32/steamcmd" ]]; then
+        echo "🚧 SteamCMD not found, reinstalling..."
+        curl -L -O "https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz"
+        tar zxvf "steamcmd_linux.tar.gz"
+        rm "steamcmd_linux.tar.gz"
+        # For some reason it needs to update twice?
+        box64 linux32/steamcmd $STEAM_SCRIPT_BASE +quit >/dev/null
+    else
+        echo "🚧 Updating SteamCMD..."
+    fi
     box64 linux32/steamcmd $STEAM_SCRIPT_BASE +quit >/dev/null
+    find "package" -name "*.zip.*" -delete
+    popd > /dev/null
 else
-    echo "🚧 Updating SteamCMD..."
+    echo "🚧 SteamCMD update disabled."
 fi
-box64 linux32/steamcmd $STEAM_SCRIPT_BASE +quit >/dev/null
-find "package" -name "*.zip.*" -delete
-popd > /dev/null
 
 if [[ $UPDATE_GAME == true ]]; then
     echo "🎮 Game update enabled."
@@ -325,7 +332,7 @@ if [[ $UPDATE_WORKSHOP == true ]]; then
                     box64 steamcmd/linux32/steamcmd $STEAM_SCRIPT_BASE +login anonymous $LOOP_TMP_WORKSHOP_SCRIPT +quit >/dev/null
                     # Sometimes SteamCMD can't even launch normally, if that's the case don't bother checking every mods and finish this loop right here.
                     if [[ ! -f "/server/steamcmd/home/Steam/logs/workshop_log.txt" ]]; then
-                        echo "  ❌ Unable to download anything, retry $(($LOOP_TEMP_WORKSHOP_RETRY+1))/$WORKSHOP_MAX_RETRY in 30 seconds."
+                        echo "    ❌ Unable to download anything, retry $(($LOOP_TEMP_WORKSHOP_RETRY+1))/$WORKSHOP_MAX_RETRY in 30 seconds."
                         sleep 30
                         continue
                     fi
