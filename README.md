@@ -27,7 +27,7 @@ services:
       - ~/.starbound-mods:/server/starbound/mods
       - ~/.starbound-storage:/server/starbound/storage
       - ~/.starbound-backup:/server/backup
-      - ~/starbound.env:/server/starbound.env
+      - ~/.starbound-data:/server/data
     restart: unless-stopped
 ```
 
@@ -35,7 +35,7 @@ This [docker-compose.yml](/docker-compose.yml) example only mounts some user ser
 | Container Path | Info |
 |:----|:----|
 | /server/starbound.sh        | Main script                                                |
-| /server/starbound.env       | Environment variables controlling the script’s behaviour   |
+| /server/data/starbound.env  | Environment variables controlling the script’s behaviour   |
 | /server/steamcmd            | SteamCMD and everything used by it                         |
 | /server/starbound/mods      | All .pak mods and workshop mod symlinks                    |
 | /server/starbound/storage   | Save files                                                 |
@@ -46,6 +46,8 @@ This [docker-compose.yml](/docker-compose.yml) example only mounts some user ser
 | /server/backup              | Backup data                                                |
 
 ## Environment Variables
+These variables should be modified in `starbound.env` instead of `docker-compose.yml` because the main script will read them from `starbound.env` at runtime, if you still prefer that you can place an empty `starbound.env` to bypass re-creation.
+
 | Variable | Default | Example | Info |
 |:----|:----|:----|:----|
 | `STEAM_LOGIN`           | `"anonymous"` | `"myusername mypassword"` | Your Steam credentials, required to download the game, workshop mods are always downloaded anonymously.                                                               |

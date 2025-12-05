@@ -107,17 +107,17 @@ ENV BOX64_LOG=0 \
     BOX64_DYNAREC_FASTNAN=1 \
     BOX64_DYNAREC_X87DOUBLE=0
 
-RUN mkdir -m 755 -p /server/{backup,steamcmd/home,starbound/{assets,mods,storage,logs,steamapps}} && \
+RUN mkdir -m 755 -p /server/{backup,data,steamcmd/home,starbound/{assets,mods,storage,logs,steamapps}} && \
     groupadd -g 1000 steam && \
     useradd -u 1000 -g steam -d /server/steamcmd/home steam && \
     chown -R steam:steam /server
 
 USER steam
 WORKDIR /server
-COPY --chown=root:root   --chmod=755 --from=builder-box64  /output/box64 /
+COPY --chown=root:root   --chmod=755 --from=builder-box64  /output/box64         /
 COPY --chown=steam:steam --chmod=755 --from=builder-osb    /output/openstarbound /server/openstarbound
-COPY --chown=steam:steam --chmod=755 starbound.sh starbound.env /server/
-
+COPY --chown=steam:steam --chmod=755                       starbound.sh          /server/
+COPY --chown=steam:steam --chmod=755                       starbound.env         /server/data/
 RUN if [[ "$TARGETPLATFORM" == "linux/amd64" ]]; then \
         sed -ir "s/box64\s/\.\//g" /server/starbound.sh && \
         sed -ir "s/\sARM\s/ x86 /g" /server/starbound.sh; \

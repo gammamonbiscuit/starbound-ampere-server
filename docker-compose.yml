@@ -9,5 +9,5 @@ services:
       - ~/.starbound-mods:/server/starbound/mods
       - ~/.starbound-storage:/server/starbound/storage
       - ~/.starbound-backup:/server/backup
-      - ~/starbound.env:/server/starbound.env
+      - ~/.starbound-data:/server/data
     restart: unless-stopped

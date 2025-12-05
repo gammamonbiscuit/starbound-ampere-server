@@ -2,10 +2,11 @@
 echo "🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫"
 echo "   Biscuit's Starbound ARM server docker   "
 echo "🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫"
+mkdir -m 755 -p /server/{backup,data,steamcmd/home,starbound/{assets,mods,storage,logs,steamapps}}
 
-if [[ ! -f "/server/starbound.env" ]]; then
+if [[ ! -f "/server/data/starbound.env" ]]; then
     echo "🚧 Creating config file..."
-    tee "/server/starbound.env" <<EOF >/dev/null
+    tee "/server/data/starbound.env" <<EOF >/dev/null
 # Your Steam credentials, required to download the game, workshop mods are always downloaded anonymously.
 # Default: "anonymous"
 # Example: "myusername mypassword"
@@ -82,10 +83,8 @@ WORKSHOP_MAX_RETRY=$WORKSHOP_MAX_RETRY
 EOF
 else
     echo "🚧 Reading config file..."
-    source "/server/starbound.env"
+    source "/server/data/starbound.env"
 fi
-
-mkdir -m 755 -p /server/{backup,steamcmd/home,starbound/{assets,mods,storage,logs,steamapps}}
 
 if [[ $OPENSTARBOUND == true ]]; then
     echo "🎮 OpenStarbound selected."
@@ -143,6 +142,7 @@ else
     echo "🚧 SteamCMD update disabled."
 fi
 
+# Update game data on launch if needed.
 if [[ $UPDATE_GAME == true ]]; then
     echo "🎮 Game update enabled."
     UPDATE_GAME_BIN=true
