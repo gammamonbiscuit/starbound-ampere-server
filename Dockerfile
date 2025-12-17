@@ -4,7 +4,7 @@ SHELL ["/bin/bash", "-c"]
 
 ARG TARGETPLATFORM \
     DEBIAN_FRONTEND=noninteractive \
-    VCPKG_ROOT=/compile/vcpkg \
+    VCPKG_ROOT=/compile/vcpkg
 ENV OPENSTARBOUND_VERSION=v0.1.14
 
 RUN --mount=type=cache,id=apt-$TARGETPLATFORM,sharing=locked,target=/var/cache/apt \
