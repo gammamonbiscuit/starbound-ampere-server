@@ -3,10 +3,9 @@ FROM debian:trixie-slim AS base
 SHELL ["/bin/bash", "-c"]
 
 ARG TARGETPLATFORM \
-    DOCKER_BUILD=true \
     DEBIAN_FRONTEND=noninteractive \
     VCPKG_ROOT=/compile/vcpkg \
-    OPENSTARBOUND_VERSION=v0.1.14
+ENV OPENSTARBOUND_VERSION=v0.1.14
 
 RUN --mount=type=cache,id=apt-$TARGETPLATFORM,sharing=locked,target=/var/cache/apt \
     --mount=type=cache,id=apt-$TARGETPLATFORM,sharing=locked,target=/var/lib/apt \
@@ -25,9 +24,18 @@ RUN --mount=type=cache,id=apt-$TARGETPLATFORM,sharing=locked,target=/var/cache/a
         apt install -y build-essential cmake pkg-config libxmu-dev libxi-dev libgl-dev libglu1-mesa-dev libsdl2-dev python3-jinja2 ninja-build autoconf automake autoconf-archive libltdl-dev; \
     fi
 
-RUN mkdir -p /{compile,output/box64}
+RUN mkdir -p /{compile,output/{steamcmd,box64}}
 
 WORKDIR /compile
+
+FROM builder AS builder-steam
+
+RUN if [[ "$TARGETPLATFORM" == "$TARGETPLATFORM" ]]; then \
+        cd /output/steamcmd && \
+        curl -L -O "https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz" && \
+        tar zxvf "steamcmd_linux.tar.gz" && \
+        rm "steamcmd_linux.tar.gz"; \
+    fi
 
 FROM builder AS builder-box64
 
@@ -58,8 +66,16 @@ RUN if [[ "$TARGETPLATFORM" == "linux/arm64" ]]; then \
         cd /compile/OpenStarbound/build/linux-arm-release && \
         cmake --build . --parallel $(nproc) && \
         cd /compile/OpenStarbound && \
-        ./scripts/ci/linux/assemble.sh && \
-        mv server_distribution /output/openstarbound; \
+        mkdir -p /output/openstarbound/{assets,mods,linux} && \
+        ./dist/asset_packer -c scripts/packing.config -s assets/opensb /output/openstarbound/assets/opensb.pak && \
+        mv \
+          dist/starbound_server \
+          dist/btree_repacker \
+          dist/asset_packer \
+          dist/asset_unpacker \
+          scripts/ci/linux/sbinit.config \
+          scripts/steam_appid.txt \
+          /output/openstarbound/linux/; \        
     fi
 
 RUN if [[ "$TARGETPLATFORM" == "linux/amd64" ]]; then \
@@ -116,13 +132,13 @@ USER steam
 WORKDIR /server
 COPY --chown=root:root   --chmod=755 --from=builder-box64  /output/box64         /
 COPY --chown=steam:steam --chmod=755 --from=builder-osb    /output/openstarbound /server/openstarbound
+COPY --chown=steam:steam --chmod=755 --from=builder-steam  /output/steamcmd      /server/steamcmd
 COPY --chown=steam:steam --chmod=755                       starbound.sh          /server/
 COPY --chown=steam:steam --chmod=755                       starbound.env         /server/data/
 RUN if [[ "$TARGETPLATFORM" == "linux/amd64" ]]; then \
         sed -ir "s/box64\s/\.\//g" /server/starbound.sh && \
         sed -ir "s/\sARM\s/ x86 /g" /server/starbound.sh; \
     fi
-#RUN /server/starbound.sh # To include SteamCMD and OpenStarbound components in /server
 EXPOSE 21025/tcp
 STOPSIGNAL SIGINT
 ENTRYPOINT ["/bin/bash", "-c"]

@@ -230,11 +230,6 @@ if [[ $UPDATE_GAME_BIN == true || $UPDATE_GAME_PAK_MAIN == true || $UPDATE_GAME_
     fi
 fi
 
-# Finish docker build
-if [[ $DOCKER_BUILD == true ]]; then
-    exit
-fi
-
 if [[ $UPDATE_WORKSHOP == true ]]; then
     echo "⚙️ Workshop content update enabled."
     WORKSHOP_ALL=""
