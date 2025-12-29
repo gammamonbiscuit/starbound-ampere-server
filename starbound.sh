@@ -5,18 +5,18 @@ echo "🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫�
 
 echo "🚧 Permission check"
 PERMISSION_CHECK=("/server" "/server/starbound" "/server/steamcmd" "/server/data" "/server/backup")
-for PERMISSION_CHECK_LOOP in "${PERMISSION_CHECK[@]}"; do
-    if [[ -d $PERMISSION_CHECK_LOOP ]]; then
-        if ! [[ -r $PERMISSION_CHECK_LOOP && -w $PERMISSION_CHECK_LOOP && -x $PERMISSION_CHECK_LOOP ]]; then
-            echo "  ❌ $PERMISSION_CHECK_LOOP is not accessable by $(id -u):$(id -g), paused until this is resolved."
-            until [[ -r $PERMISSION_CHECK_LOOP && -w $PERMISSION_CHECK_LOOP && -x $PERMISSION_CHECK_LOOP ]]; do
-                stat -c "    ❌ Current permission of [$PERMISSION_CHECK_LOOP]: %A(%a) %U(%u) %G(%g)" $PERMISSION_CHECK_LOOP
+for LOOP_PERMISSION_CHECK in "${PERMISSION_CHECK[@]}"; do
+    if [[ -d $LOOP_PERMISSION_CHECK ]]; then
+        if ! [[ -r $LOOP_PERMISSION_CHECK && -w $LOOP_PERMISSION_CHECK && -x $LOOP_PERMISSION_CHECK ]]; then
+            echo "  ❌ $LOOP_PERMISSION_CHECK is not accessable by $(id -u):$(id -g), paused until this is resolved."
+            until [[ -r $LOOP_PERMISSION_CHECK && -w $LOOP_PERMISSION_CHECK && -x $LOOP_PERMISSION_CHECK ]]; do
+                stat -c "    ❌ Current permission of [$LOOP_PERMISSION_CHECK]: %A(%a) %U(%u) %G(%g)" $LOOP_PERMISSION_CHECK
                 sleep 5
             done
         fi
-        echo "  ✔️ $PERMISSION_CHECK_LOOP"
+        echo "  ✔️ $LOOP_PERMISSION_CHECK"
     else
-        echo "  ✔️ $PERMISSION_CHECK_LOOP (Not exist yet)"
+        echo "  ✔️ $LOOP_PERMISSION_CHECK (Not exist yet)"
     fi
 done
 
