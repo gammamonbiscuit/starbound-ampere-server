@@ -2,6 +2,24 @@
 echo "🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫"
 echo "   Biscuit's Starbound ARM server docker   "
 echo "🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫"
+
+echo "🚧 Permission check"
+PERMISSION_CHECK=("/server" "/server/starbound" "/server/steamcmd" "/server/data" "/server/backup")
+for PERMISSION_CHECK_LOOP in "${PERMISSION_CHECK[@]}"; do
+    if [[ -d $PERMISSION_CHECK_LOOP ]]; then
+        if ! [[ -r $PERMISSION_CHECK_LOOP && -w $PERMISSION_CHECK_LOOP && -x $PERMISSION_CHECK_LOOP ]]; then
+            echo "  ❌ $PERMISSION_CHECK_LOOP is not accessable by $(id -u):$(id -g), paused until this is resolved."
+            until [[ -r $PERMISSION_CHECK_LOOP && -w $PERMISSION_CHECK_LOOP && -x $PERMISSION_CHECK_LOOP ]]; do
+                stat -c "    ❌ Current permission of [$PERMISSION_CHECK_LOOP]: %A(%a) %U(%u) %G(%g)" $PERMISSION_CHECK_LOOP
+                sleep 5
+            done
+        fi
+        echo "  ✔️ $PERMISSION_CHECK_LOOP"
+    else
+        echo "  ✔️ $PERMISSION_CHECK_LOOP (Not exist yet)"
+    fi
+done
+
 mkdir -m 755 -p /server/{backup,data,steamcmd/home,starbound/{assets,mods,storage,logs,steamapps}}
 
 if [[ ! -f "/server/data/starbound.env" ]]; then
