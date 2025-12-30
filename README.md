@@ -32,6 +32,7 @@ services:
 ```
 
 This [docker-compose.yml](/docker-compose.yml) example only mounts some user serviceable paths, but if you have more needs, here are some info about the `/server` directory:
+
 | Container Path | Info |
 |:----|:----|
 | /server/starbound.sh        | Main script                                                |
@@ -44,6 +45,20 @@ This [docker-compose.yml](/docker-compose.yml) example only mounts some user ser
 | /server/starbound/steamapps | Workshop mods                                              |
 | /server/openstarbound       | Pre-compiled OpenStarbound ARM build                       |
 | /server/backup              | Backup data                                                |
+
+## Steam Guard and packed.pak
+You don't need to disable Steam Guard if you have mobile authenticator enabled. Steam will use a interactive notification in the app to let you proceed with the login request, it might ask you few more questions if you're logging in from an unusual location, for example, a VPS in another country.
+
+With OpenStarbound being the default game engine used in this image, you do not need to login to Steam to download vanilla Starbound, but the `packed.pak` that comes with it is still a problem. To solve this you can use the `packed.pak` from the Starbound copy you own, bind `/server/starbound/assets` to host and put `packed.pak` inside to eliminate the need of Steam login.
+
+It can be found in the following locations, it is recommended to copy from dedicated server, it contains the minimal needed files for server to operate.
+
+`[Steam Root]/steamapps/common/Starbound Dedicated Server/assets/packed.pak`
+
+The one from client also works.
+
+`[Steam Root]/steamapps/common/Starbound/assets/packed.pak`
+
 
 ## Environment Variables
 These variables should be modified in `starbound.env` instead of `docker-compose.yml` because the main script will read them from `starbound.env` at runtime, if you still prefer that you can place an empty `starbound.env` to bypass re-creation.
