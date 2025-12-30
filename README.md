@@ -47,7 +47,7 @@ This [docker-compose.yml](/docker-compose.yml) example only mounts some user ser
 | /server/backup              | Backup data                                                |
 
 ## Steam Guard and packed.pak
-You don't need to disable Steam Guard if you have mobile authenticator enabled. Steam will use a interactive notification in the app to let you proceed with the login request, it might ask you few more questions if you're logging in from an unusual location, for example, a VPS in another country.
+You do not need to disable Steam Guard if you have mobile authenticator enabled. Steam will use a interactive notification in the app to let you proceed with the login request, it might ask you few more questions if you are logging in from an unusual location, for example, a VPS in another country.
 
 With OpenStarbound being the default game engine used in this image, you do not need to login to Steam to download vanilla Starbound, but the `packed.pak` that comes with it is still a problem. To solve this you can use the `packed.pak` from the Starbound copy you own, bind `/server/starbound/assets` to host and put `packed.pak` inside to eliminate the need of Steam login.
 
