@@ -11,8 +11,7 @@ RUN --mount=type=cache,id=apt-$TARGETPLATFORM,sharing=locked,target=/var/cache/a
     --mount=type=cache,id=apt-$TARGETPLATFORM,sharing=locked,target=/var/lib/apt \
     --mount=type=cache,id=apt-$TARGETPLATFORM,sharing=locked,target=/var/cache/debconf \
     apt update && \
-    apt install -y --no-install-recommends curl ca-certificates zip unzip tar git jq $([[ "$TARGETPLATFORM" == "linux/amd64" ]] && echo "lib32stdc++6") && \
-    OPENSTARBOUND_VERSION=${OPENSTARBOUND_VERSION:-main}
+    apt install -y --no-install-recommends curl ca-certificates zip unzip tar git jq $([[ "$TARGETPLATFORM" == "linux/amd64" ]] && echo "lib32stdc++6")
 
 FROM base AS builder
 
@@ -57,7 +56,7 @@ RUN if [[ "$TARGETPLATFORM" == "linux/arm64" ]]; then \
     fi
 
 RUN if [[ "$TARGETPLATFORM" == "linux/arm64" ]]; then \
-        git clone --depth 1 --branch ${OPENSTARBOUND_VERSION} https://github.com/OpenStarbound/OpenStarbound.git && \
+        git clone --depth 1 --branch ${OPENSTARBOUND_VERSION:-main} https://github.com/OpenStarbound/OpenStarbound.git && \
         cp -R /OpenStarbound-ARM/. /compile/OpenStarbound/ && \
         cd /compile/OpenStarbound/source && \
         cmake --preset=linux-arm-release; \
