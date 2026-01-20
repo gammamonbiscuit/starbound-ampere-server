@@ -79,10 +79,13 @@ RUN if [[ "$TARGETPLATFORM" == "linux/arm64" ]]; then \
     fi
 
 RUN if [[ "$TARGETPLATFORM" == "linux/amd64" ]]; then \
-        curl -L -O "https://github.com/OpenStarbound/OpenStarbound/releases/download/${OPENSTARBOUND_VERSION}/OpenStarbound-Linux-Clang-Server.zip" && \
-        unzip "OpenStarbound-Linux-Clang-Server.zip" && \
-        curl -L -O "https://github.com/OpenStarbound/OpenStarbound/releases/download/${OPENSTARBOUND_VERSION}/OpenStarbound-Linux-Clang-Client.zip" && \
-        unzip "OpenStarbound-Linux-Clang-Client.zip" && \
+        if [[ -z "$OPENSTARBOUND_VERSION" ]]; then \
+            ASSETS=https://nightly.link/OpenStarbound/OpenStarbound/workflows/build/main; \
+        else \
+            ASSETS=https://github.com/OpenStarbound/OpenStarbound/releases/download/${OPENSTARBOUND_VERSION}; \
+        fi && \
+        curl -L -O "${ASSETS}/OpenStarbound-Linux-Clang-{Server,Client}.zip" && \
+        unzip "OpenStarbound-Linux-Clang-*.zip" && \
         if [[ -f "server.tar" && -f "client.tar" ]]; then \
             tar xvf "server.tar" && \
             tar xvf "client.tar" && \
