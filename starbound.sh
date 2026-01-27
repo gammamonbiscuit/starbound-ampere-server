@@ -1,7 +1,7 @@
 #!/bin/bash
-echo "🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫"
-echo "   Biscuit's Starbound ARM server docker   "
-echo "🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫🍫"
+echo "⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐"
+echo "   Starbound Ampere Server   "
+echo "⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐"
 
 echo "🚧 Permission check"
 PERMISSION_CHECK=("/server" "/server/starbound" "/server/steamcmd" "/server/data" "/server/backup")

@@ -1,4 +1,4 @@
-# Biscuit's Starbound ARM Dedicated Server Docker
+# Starbound Ampere Server
 This is my attempt on running Starbound dedicated server in an Oracle Ampere A1 Compute instance, with OpenStarbound and Steam workshop mod support.
 
 >[!WARNING]

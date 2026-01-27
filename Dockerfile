@@ -139,8 +139,7 @@ COPY --chown=steam:steam --chmod=755 --from=builder-steam  /output/steamcmd     
 COPY --chown=steam:steam --chmod=755                       starbound.sh          /server/
 COPY --chown=steam:steam --chmod=755                       starbound.env         /server/data/
 RUN if [[ "$TARGETPLATFORM" == "linux/amd64" ]]; then \
-        sed -ir "s/box64\s/\.\//g" /server/starbound.sh && \
-        sed -ir "s/\sARM\s/ x86 /g" /server/starbound.sh; \
+        sed -ir "s/box64\s/\.\//g" /server/starbound.sh; \
     fi
 EXPOSE 21025/tcp
 STOPSIGNAL SIGINT
