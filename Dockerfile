@@ -11,7 +11,7 @@ RUN --mount=type=cache,id=apt-$TARGETPLATFORM,sharing=locked,target=/var/cache/a
     --mount=type=cache,id=apt-$TARGETPLATFORM,sharing=locked,target=/var/lib/apt \
     --mount=type=cache,id=apt-$TARGETPLATFORM,sharing=locked,target=/var/cache/debconf \
     apt update && \
-    apt install -y --no-install-recommends curl ca-certificates zip unzip tar git jq $([[ "$TARGETPLATFORM" == "linux/amd64" ]] && echo "lib32stdc++6")
+    apt install -y --no-install-recommends curl ca-certificates zip unzip tar git jq $([[ "$TARGETPLATFORM" == "linux/amd64" ]] && echo "lib32stdc++6 libcap-dev libglfw3-dev libepoxy-dev")
 
 FROM base AS builder
 
@@ -21,10 +21,10 @@ RUN --mount=type=cache,id=apt-$TARGETPLATFORM,sharing=locked,target=/var/cache/a
     --mount=type=cache,id=apt-$TARGETPLATFORM,sharing=locked,target=/var/lib/apt \
     --mount=type=cache,id=apt-$TARGETPLATFORM,sharing=locked,target=/var/cache/debconf \
     if [[ "$TARGETPLATFORM" == "linux/arm64" ]]; then \
-        apt install -y build-essential cmake pkg-config libxmu-dev libxi-dev libgl-dev libglu1-mesa-dev libsdl2-dev python3-jinja2 ninja-build autoconf automake autoconf-archive libltdl-dev; \
+        apt install -y build-essential cmake pkg-config libxmu-dev libxi-dev libgl-dev libglu1-mesa-dev libsdl2-dev python3-jinja2 ninja-build autoconf automake autoconf-archive libltdl-dev \ 
+                       clang-19 llvm-19 nasm python3-dev python3 linux-headers-generic qtbase5-dev qtdeclarative5-dev lld; \
     fi
-
-RUN mkdir -p /{compile,output/{steamcmd,box64}}
+RUN mkdir -p /{compile,output/{steamcmd,box64,fex}}
 
 WORKDIR /compile
 
@@ -35,6 +35,19 @@ RUN if [[ "$TARGETPLATFORM" == "$TARGETPLATFORM" ]]; then \
         curl -L -O "https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz" && \
         tar zxvf "steamcmd_linux.tar.gz" && \
         rm "steamcmd_linux.tar.gz"; \
+    fi
+
+FROM builder AS builder-fex
+
+ARG CC=clang-19
+ARG CXX=clang++-19
+RUN if [[ "$TARGETPLATFORM" == "linux/arm64" ]]; then \
+        git clone --depth 1 --recurse-submodules https://github.com/FEX-Emu/FEX.git && \
+        cd /compile/FEX && \
+        mkdir build && \
+        cmake -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release -DUSE_LINKER=lld -DENABLE_LTO=True -DBUILD_TESTING=False -DENABLE_ASSERTIONS=False -G Ninja . && \
+        ninja && \
+        mv /compile/FEX/Bin/* /output/fex; \
     fi
 
 FROM builder AS builder-box64
@@ -133,6 +146,7 @@ RUN mkdir -m 755 -p /server/{backup,data,steamcmd/home,starbound/{assets,mods,st
 
 USER steam
 WORKDIR /server
+COPY --chown=root:root   --chmod=755 --from=builder-fex    /output/fex           /usr/bin/
 COPY --chown=root:root   --chmod=755 --from=builder-box64  /output/box64         /
 COPY --chown=steam:steam --chmod=755 --from=builder-osb    /output/openstarbound /server/openstarbound
 COPY --chown=steam:steam --chmod=755 --from=builder-steam  /output/steamcmd      /server/steamcmd
