@@ -6,13 +6,14 @@ ARG TARGETPLATFORM \
     DEBIAN_FRONTEND=noninteractive \
     VCPKG_ROOT=/compile/vcpkg
 ENV FEX_ENABLED=true \
+    FEX_ROOTFS_IN_TMP=true \
     OPENSTARBOUND_VERSION=v0.1.14
 
 RUN --mount=type=cache,id=apt-$TARGETPLATFORM,sharing=locked,target=/var/cache/apt \
     --mount=type=cache,id=apt-$TARGETPLATFORM,sharing=locked,target=/var/lib/apt \
     --mount=type=cache,id=apt-$TARGETPLATFORM,sharing=locked,target=/var/cache/debconf \
     apt update && \
-    apt install -y --no-install-recommends curl ca-certificates zip unzip tar git jq libcap-dev libglfw3-dev libepoxy-dev squashfs-tools squashfuse $([[ "$TARGETPLATFORM" == "linux/amd64" ]] && echo "lib32stdc++6")
+    apt install -y --no-install-recommends curl ca-certificates zip unzip tar git jq $([[ "$TARGETPLATFORM" == "linux/arm64" && "$FEX_ENABLED" == true ]] && echo "libcap-dev libglfw3-dev libepoxy-dev squashfs-tools squashfuse") $([[ "$TARGETPLATFORM" == "linux/amd64" ]] && echo "lib32stdc++6")
 
 FROM base AS builder
 
@@ -27,7 +28,7 @@ RUN --mount=type=cache,id=apt-$TARGETPLATFORM,sharing=locked,target=/var/cache/a
             apt install -y clang-19 llvm-19 lld qtbase5-dev qtdeclarative5-dev python3-dev python3; \
         fi \
     fi
-RUN mkdir -p /{compile,output/{steamcmd,box64,fex}}
+RUN mkdir -p /{compile,output/{steamcmd,box64,fex,openstarbound}}
 
 WORKDIR /compile
 
@@ -142,7 +143,7 @@ ENV BOX64_LOG=0 \
     BOX64_DYNAREC_FASTNAN=1 \
     BOX64_DYNAREC_X87DOUBLE=0
 
-RUN mkdir -m 755 -p /server/{backup,data,steamcmd/home,starbound/{assets,mods,storage,logs,steamapps}} && \
+RUN mkdir -m 755 -p /server/{backup,data,steamcmd/home/.fex-emu,starbound/{assets,mods,storage,logs,steamapps}} && \
     groupadd -g 1000 steam && \
     useradd -u 1000 -g steam -d /server/steamcmd/home steam && \
     chown -R steam:steam /server
@@ -155,12 +156,9 @@ COPY --chown=steam:steam --chmod=755 --from=builder-osb    /output/openstarbound
 COPY --chown=steam:steam --chmod=755 --from=builder-steam  /output/steamcmd      /server/steamcmd
 COPY --chown=steam:steam --chmod=755                       starbound.sh          /server/
 COPY --chown=steam:steam --chmod=755                       starbound.env         /server/data/
-RUN if [[ "$TARGETPLATFORM" == "linux/arm64" && "$FEX_ENABLED" == true ]]; then \
+RUN if [[ "$TARGETPLATFORM" == "linux/arm64" && "$FEX_ENABLED" == true && ! "$FEX_ROOTFS_IN_TMP" == true ]]; then \
         FEXRootFSFetcher -y -x --distro-name=ubuntu --distro-version=24.04 && \
-        rm $HOME/.local/share/fex-emu/RootFS/*.sqsh && \
-        mkdir -p $HOME/.fex-emu/RootFS && \
-        ln -vfs $HOME/.local/share/fex-emu/RootFS/* $HOME/.fex-emu/RootFS/ && \
-        echo '{"Config":{"RootFS":"Ubuntu_24_04"}}' >$HOME/.fex-emu/Config.json; \
+        rm /server/steamcmd/home/.fex-emu/RootFS/*.sqsh; \
     fi
 RUN if [[ "$TARGETPLATFORM" == "linux/amd64" ]]; then \
         sed -ir "s/box64\s/\.\//g" /server/starbound.sh; \

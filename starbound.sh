@@ -22,6 +22,15 @@ done
 
 mkdir -m 755 -p /server/{backup,data,steamcmd/home,starbound/{assets,mods,storage,logs,steamapps}}
 
+if [[ "$TARGETPLATFORM" == "linux/arm64" && "$FEX_ENABLED" == true && "$FEX_ROOTFS_IN_TMP" == true ]]; then
+    echo "🚧 Initialise FEX-Emu RootFS"
+    mkdir -p /tmp/RootFS
+    ln -vfs /tmp/RootFS /server/steamcmd/home/.fex-emu/RootFS
+    FEXRootFSFetcher -y -x --distro-name=ubuntu --distro-version=24.04
+    rm /server/steamcmd/home/.fex-emu/RootFS/*.sqsh
+fi
+sleep infinity
+
 if [[ ! -f "/server/data/starbound.env" ]]; then
     echo "🚧 Creating config file..."
     tee "/server/data/starbound.env" <<EOF >/dev/null
