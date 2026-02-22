@@ -5,13 +5,14 @@ SHELL ["/bin/bash", "-c"]
 ARG TARGETPLATFORM \
     DEBIAN_FRONTEND=noninteractive \
     VCPKG_ROOT=/compile/vcpkg
-ENV OPENSTARBOUND_VERSION=v0.1.14
+ENV FEX_ENABLED=true \
+    OPENSTARBOUND_VERSION=v0.1.14
 
 RUN --mount=type=cache,id=apt-$TARGETPLATFORM,sharing=locked,target=/var/cache/apt \
     --mount=type=cache,id=apt-$TARGETPLATFORM,sharing=locked,target=/var/lib/apt \
     --mount=type=cache,id=apt-$TARGETPLATFORM,sharing=locked,target=/var/cache/debconf \
     apt update && \
-    apt install -y --no-install-recommends curl ca-certificates zip unzip tar git jq $([[ "$TARGETPLATFORM" == "linux/amd64" ]] && echo "lib32stdc++6 libcap-dev libglfw3-dev libepoxy-dev")
+    apt install -y --no-install-recommends curl ca-certificates zip unzip tar git jq libcap-dev libglfw3-dev libepoxy-dev squashfs-tools squashfuse $([[ "$TARGETPLATFORM" == "linux/amd64" ]] && echo "lib32stdc++6")
 
 FROM base AS builder
 
@@ -21,8 +22,10 @@ RUN --mount=type=cache,id=apt-$TARGETPLATFORM,sharing=locked,target=/var/cache/a
     --mount=type=cache,id=apt-$TARGETPLATFORM,sharing=locked,target=/var/lib/apt \
     --mount=type=cache,id=apt-$TARGETPLATFORM,sharing=locked,target=/var/cache/debconf \
     if [[ "$TARGETPLATFORM" == "linux/arm64" ]]; then \
-        apt install -y build-essential cmake pkg-config libxmu-dev libxi-dev libgl-dev libglu1-mesa-dev libsdl2-dev python3-jinja2 ninja-build autoconf automake autoconf-archive libltdl-dev \ 
-                       clang-19 llvm-19 nasm python3-dev python3 linux-headers-generic qtbase5-dev qtdeclarative5-dev lld; \
+        apt install -y build-essential cmake pkg-config libxmu-dev libxi-dev libgl-dev libglu1-mesa-dev libsdl2-dev python3-jinja2 ninja-build autoconf automake autoconf-archive libltdl-dev && \ 
+        if [[ "$FEX_ENABLED" == true ]]; then \
+            apt install -y clang-19 llvm-19 lld qtbase5-dev qtdeclarative5-dev python3-dev python3; \
+        fi \
     fi
 RUN mkdir -p /{compile,output/{steamcmd,box64,fex}}
 
@@ -41,18 +44,18 @@ FROM builder AS builder-fex
 
 ARG CC=clang-19
 ARG CXX=clang++-19
-RUN if [[ "$TARGETPLATFORM" == "linux/arm64" ]]; then \
+RUN if [[ "$TARGETPLATFORM" == "linux/arm64" && "$FEX_ENABLED" == true ]]; then \
         git clone --depth 1 --recurse-submodules https://github.com/FEX-Emu/FEX.git && \
         cd /compile/FEX && \
         mkdir build && \
         cmake -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release -DUSE_LINKER=lld -DENABLE_LTO=True -DBUILD_TESTING=False -DENABLE_ASSERTIONS=False -G Ninja . && \
-        ninja && \
+        ninja -j$(nproc) && \
         mv /compile/FEX/Bin/* /output/fex; \
     fi
 
 FROM builder AS builder-box64
 
-RUN if [[ "$TARGETPLATFORM" == "linux/arm64" ]]; then \
+RUN if [[ "$TARGETPLATFORM" == "linux/arm64" && ! "$FEX_ENABLED" == true ]]; then \
         git clone --depth 1 https://github.com/ptitSeb/box64.git && \
         cd /compile/box64 && \
         cmake . -D ADLINK=1 -D ARM_DYNAREC=ON -D BOX32=ON -D BOX32_BINFMT=ON -D CMAKE_BUILD_TYPE=Release && \
@@ -152,6 +155,13 @@ COPY --chown=steam:steam --chmod=755 --from=builder-osb    /output/openstarbound
 COPY --chown=steam:steam --chmod=755 --from=builder-steam  /output/steamcmd      /server/steamcmd
 COPY --chown=steam:steam --chmod=755                       starbound.sh          /server/
 COPY --chown=steam:steam --chmod=755                       starbound.env         /server/data/
+RUN if [[ "$TARGETPLATFORM" == "linux/arm64" && "$FEX_ENABLED" == true ]]; then \
+        FEXRootFSFetcher -y -x --distro-name=ubuntu --distro-version=24.04 && \
+        rm $HOME/.local/share/fex-emu/RootFS/*.sqsh && \
+        mkdir -p $HOME/.fex-emu/RootFS && \
+        ln -vfs $HOME/.local/share/fex-emu/RootFS/* $HOME/.fex-emu/RootFS/ && \
+        echo '{"Config":{"RootFS":"Ubuntu_24_04"}}' >$HOME/.fex-emu/Config.json; \
+    fi
 RUN if [[ "$TARGETPLATFORM" == "linux/amd64" ]]; then \
         sed -ir "s/box64\s/\.\//g" /server/starbound.sh; \
     fi
