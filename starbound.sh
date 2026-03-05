@@ -20,16 +20,24 @@ for LOOP_PERMISSION_CHECK in "${PERMISSION_CHECK[@]}"; do
     fi
 done
 
-mkdir -m 755 -p /server/{backup,data,steamcmd/home,starbound/{assets,mods,storage,logs,steamapps}}
+mkdir -m 755 -p /server/{backup,data,steamcmd/home/.fex-emu,starbound/{assets,mods,storage,logs,steamapps}}
 
 if [[ "$TARGETPLATFORM" == "linux/arm64" && "$FEX_ENABLED" == true && "$FEX_ROOTFS_IN_TMP" == true ]]; then
-    echo "🚧 Initialise FEX-Emu RootFS"
-    mkdir -p /tmp/RootFS
-    ln -vfs /tmp/RootFS /server/steamcmd/home/.fex-emu/RootFS
-    FEXRootFSFetcher -y -x --distro-name=ubuntu --distro-version=24.04
-    rm /server/steamcmd/home/.fex-emu/RootFS/*.sqsh
+    echo "🚧 Checking if FEX-Emu RootFS is valid"
+    FEX_ROOTFS_VALID=$(FEXBash exit 2>&1)
+    if [[ -z "$FEX_ROOTFS_VALID" ]]; then
+        echo "  ✔️ FEX-Emu is working"
+    else
+        echo "  ☁️ Initialising FEX-Emu RootFS..."
+        mkdir -p /tmp/RootFS
+        rm -rfv "/server/steamcmd/home/.fex-emu/RootFS"
+        ln -vfs "/tmp/RootFS" "/server/steamcmd/home/.fex-emu/RootFS"
+        FEXRootFSFetcher -y -x --distro-name=ubuntu --distro-version=24.04
+        rm /server/steamcmd/home/.fex-emu/RootFS/*.sqsh
+        # No retry, to avoid downloading the RootFS image from FEX's server again and again.
+        FEXBash exit || exit 1
+    fi
 fi
-sleep infinity
 
 if [[ ! -f "/server/data/starbound.env" ]]; then
     echo "🚧 Creating config file..."
