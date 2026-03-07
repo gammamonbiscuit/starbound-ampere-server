@@ -1,6 +1,4 @@
-FROM debian:trixie-slim AS base
-
-SHELL ["/bin/bash", "-c"]
+FROM scratch AS init
 
 ARG TARGETPLATFORM \
     DEBIAN_FRONTEND=noninteractive \
@@ -10,6 +8,12 @@ ENV FEX_ENABLED=true \
     FEX_ROOTFS_IN_TMP=true \
     OPENSTARBOUND_VERSION=v0.1.14 \
     TARGETPLATFORM=${TARGETPLATFORM}
+
+SHELL ["/bin/bash", "-c"]
+
+FROM init AS base
+
+COPY --from=debian:trixie-slim / /
 
 RUN --mount=type=cache,id=apt-$TARGETPLATFORM,sharing=locked,target=/var/cache/apt \
     --mount=type=cache,id=apt-$TARGETPLATFORM,sharing=locked,target=/var/lib/apt \
@@ -25,12 +29,10 @@ RUN --mount=type=cache,id=apt-$TARGETPLATFORM,sharing=locked,target=/var/cache/a
     --mount=type=cache,id=apt-$TARGETPLATFORM,sharing=locked,target=/var/lib/apt \
     --mount=type=cache,id=apt-$TARGETPLATFORM,sharing=locked,target=/var/cache/debconf \
     if [[ "$TARGETPLATFORM" == "linux/arm64" ]]; then \
-        apt install -y build-essential cmake pkg-config libxmu-dev libxi-dev libgl-dev libglu1-mesa-dev libsdl2-dev python3-jinja2 ninja-build autoconf automake autoconf-archive libltdl-dev && \ 
-        if [[ "$FEX_ENABLED" == true ]]; then \
-            apt install -y clang llvm lld qtbase5-dev qtdeclarative5-dev python3-dev python3; \
-        fi \
+        apt install -y build-essential cmake pkg-config libxmu-dev libxi-dev libgl-dev libglu1-mesa-dev libsdl2-dev python3-jinja2 ninja-build autoconf automake autoconf-archive libltdl-dev; \
     fi
-RUN mkdir -p /{compile,output/{steamcmd,box64,fex,openstarbound}}
+
+RUN mkdir -p /{compile,output/{steamcmd,box64,openstarbound}}
 
 WORKDIR /compile
 
@@ -43,15 +45,24 @@ RUN if [[ "$TARGETPLATFORM" == "$TARGETPLATFORM" ]]; then \
         rm "steamcmd_linux.tar.gz"; \
     fi
 
-FROM builder AS builder-fex
+FROM init AS builder-fex
 
-ARG CC=clang
-ARG CXX=clang++
-RUN if [[ "$TARGETPLATFORM" == "linux/arm64" && "$FEX_ENABLED" == true ]]; then \
+COPY --from=ubuntu:jammy / /
+
+RUN mkdir -p /{compile,output/fex}
+
+WORKDIR /compile
+
+RUN --mount=type=cache,id=apt-ubuntu-$TARGETPLATFORM,sharing=locked,target=/var/cache/apt \
+    --mount=type=cache,id=apt-ubuntu-$TARGETPLATFORM,sharing=locked,target=/var/lib/apt \
+    --mount=type=cache,id=apt-ubuntu-$TARGETPLATFORM,sharing=locked,target=/var/cache/debconf \
+    if [[ "$TARGETPLATFORM" == "linux/arm64" && "$FEX_ENABLED" == true ]]; then \
+        apt update && \
+        apt install -y git cmake lld clang-13 llvm-13 ninja-build pkg-config libsdl2-dev qtbase5-dev qtdeclarative5-dev && \
         git clone --depth 1 --recurse-submodules https://github.com/FEX-Emu/FEX.git && \
         cd /compile/FEX && \
         mkdir build && \
-        cmake -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release -DUSE_LINKER=lld -DENABLE_LTO=True -DBUILD_TESTING=False -DENABLE_ASSERTIONS=False -G Ninja . && \
+        CC=clang-13 CXX=clang++-13 cmake -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release -DUSE_LINKER=lld -DENABLE_LTO=True -DBUILD_TESTING=False -DENABLE_ASSERTIONS=False -G Ninja . && \
         ninja -j$(nproc) && \
         mv /compile/FEX/Bin/* /output/fex; \
     fi
@@ -94,7 +105,7 @@ RUN if [[ "$TARGETPLATFORM" == "linux/arm64" ]]; then \
           dist/asset_unpacker \
           scripts/ci/linux/sbinit.config \
           scripts/steam_appid.txt \
-          /output/openstarbound/linux/; \        
+          /output/openstarbound/linux/; \
     fi
 
 RUN if [[ "$TARGETPLATFORM" == "linux/amd64" ]]; then \
@@ -108,9 +119,8 @@ RUN if [[ "$TARGETPLATFORM" == "linux/amd64" ]]; then \
         if [[ -f "server.tar" && -f "client.tar" ]]; then \
             tar xvf "server.tar" && \
             tar xvf "client.tar" && \
-            mv server_distribution /output/openstarbound && \
-            mv client_distribution/linux/asset_packer /output/openstarbound/linux/asset_packer && \
-            mv client_distribution/linux/asset_unpacker /output/openstarbound/linux/asset_unpacker && \
+            mv server_distribution/* /output/openstarbound/ && \
+            mv client_distribution/linux/asset_packer client_distribution/linux/asset_unpacker /output/openstarbound/linux/ && \
             rm /output/openstarbound/mods/mods_go_here; \
         else \
             exit 1; \
