@@ -4,9 +4,34 @@ ARG TARGETPLATFORM \
     DEBIAN_FRONTEND=noninteractive \
     VCPKG_ROOT=/compile/vcpkg
 
-ENV FEX_ENABLED=true \
+ENV OPENSTARBOUND_VERSION=v0.1.14 \
+    OPENSTARBOUND=true \
+    STEAM_LOGIN="anonymous" \
+    LAUNCH_GAME=true \
+    BACKUP_ENABLED=true \
+    BACKUP_VERSIONS=10 \
+    BACKUP_COOLDOWN=1800 \
+    BACKUP_MODS_MANUAL=false \
+    BACKUP_MODS_WORKSHOP=false \
+    UPDATE_STEAM=false \
+    UPDATE_GAME=false \
+    UPDATE_WORKSHOP=false \
+    UPDATE_WORKSHOP_FORCE=false \
+    WORKSHOP_ITEMS="" \
+    WORKSHOP_COLLECTIONS="" \
+    WORKSHOP_CHUNK=20 \
+    WORKSHOP_PRUNE=true \
+    WORKSHOP_MAX_RETRY=3 \
+    FEX_ENABLED=true \
     FEX_ROOTFS_IN_TMP=true \
-    OPENSTARBOUND_VERSION=v0.1.14 \
+    BOX64_LOG=0 \
+    BOX64_NOBANNER=1 \
+    BOX64_DYNAREC_STRONGMEM=1 \
+    BOX64_DYNAREC_BIGBLOCK=1 \
+    BOX64_DYNAREC_SAFEFLAGS=1 \
+    BOX64_DYNAREC_FASTROUND=1 \
+    BOX64_DYNAREC_FASTNAN=1 \
+    BOX64_DYNAREC_X87DOUBLE=0 \
     TARGETPLATFORM=${TARGETPLATFORM}
 
 SHELL ["/bin/bash", "-c"]
@@ -47,7 +72,7 @@ RUN if [[ "$TARGETPLATFORM" == "$TARGETPLATFORM" ]]; then \
 
 FROM init AS builder-fex
 
-COPY --from=ubuntu:jammy / /
+COPY --from=debian:bookworm-slim / /
 
 RUN mkdir -p /{compile,output/fex}
 
@@ -58,11 +83,11 @@ RUN --mount=type=cache,id=apt-ubuntu-$TARGETPLATFORM,sharing=locked,target=/var/
     --mount=type=cache,id=apt-ubuntu-$TARGETPLATFORM,sharing=locked,target=/var/cache/debconf \
     if [[ "$TARGETPLATFORM" == "linux/arm64" && "$FEX_ENABLED" == true ]]; then \
         apt update && \
-        apt install -y git cmake lld clang-13 llvm-13 ninja-build pkg-config libsdl2-dev qtbase5-dev qtdeclarative5-dev && \
+        apt install -y git cmake lld clang llvm ninja-build pkg-config libsdl2-dev qtbase5-dev qtdeclarative5-dev && \
         git clone --depth 1 --recurse-submodules https://github.com/FEX-Emu/FEX.git && \
         cd /compile/FEX && \
         mkdir build && \
-        CC=clang-13 CXX=clang++-13 cmake -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release -DUSE_LINKER=lld -DENABLE_LTO=True -DBUILD_TESTING=False -DENABLE_ASSERTIONS=False -G Ninja . && \
+        CC=clang CXX=clang++ cmake -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release -DUSE_LINKER=lld -DENABLE_LTO=True -DBUILD_TESTING=False -DENABLE_ASSERTIONS=False -G Ninja . && \
         ninja -j$(nproc) && \
         mv /compile/FEX/Bin/* /output/fex; \
     fi
@@ -128,32 +153,6 @@ RUN if [[ "$TARGETPLATFORM" == "linux/amd64" ]]; then \
     fi
 
 FROM base AS final
-
-ENV BOX64_LOG=0 \
-    BOX64_NOBANNER=1 \
-    STEAM_LOGIN="anonymous" \
-    OPENSTARBOUND=true \
-    LAUNCH_GAME=true \
-    BACKUP_ENABLED=true \
-    BACKUP_VERSIONS=10 \
-    BACKUP_COOLDOWN=1800 \
-    BACKUP_MODS_MANUAL=false \
-    BACKUP_MODS_WORKSHOP=false \
-    UPDATE_STEAM=false \
-    UPDATE_GAME=false \
-    UPDATE_WORKSHOP=false \
-    UPDATE_WORKSHOP_FORCE=false \
-    WORKSHOP_ITEMS="" \
-    WORKSHOP_COLLECTIONS="" \
-    WORKSHOP_CHUNK=20 \
-    WORKSHOP_PRUNE=true \
-    WORKSHOP_MAX_RETRY=3 \
-    BOX64_DYNAREC_STRONGMEM=1 \
-    BOX64_DYNAREC_BIGBLOCK=1 \
-    BOX64_DYNAREC_SAFEFLAGS=1 \
-    BOX64_DYNAREC_FASTROUND=1 \
-    BOX64_DYNAREC_FASTNAN=1 \
-    BOX64_DYNAREC_X87DOUBLE=0
 
 RUN mkdir -m 755 -p /server/{backup,data,steamcmd/home/.fex-emu,starbound/{assets,mods,storage,logs,steamapps}} && \
     groupadd -g 1000 steam && \
