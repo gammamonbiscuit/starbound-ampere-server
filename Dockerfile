@@ -40,9 +40,9 @@ FROM init AS base
 
 COPY --from=debian:trixie-slim / /
 
-RUN --mount=type=cache,id=apt-$TARGETPLATFORM,sharing=locked,target=/var/cache/apt \
-    --mount=type=cache,id=apt-$TARGETPLATFORM,sharing=locked,target=/var/lib/apt \
-    --mount=type=cache,id=apt-$TARGETPLATFORM,sharing=locked,target=/var/cache/debconf \
+RUN --mount=type=cache,id=apt-trixie-$TARGETPLATFORM,sharing=locked,target=/var/cache/apt \
+    --mount=type=cache,id=apt-trixie-$TARGETPLATFORM,sharing=locked,target=/var/lib/apt \
+    --mount=type=cache,id=apt-trixie-$TARGETPLATFORM,sharing=locked,target=/var/cache/debconf \
     apt update && \
     apt install -y --no-install-recommends curl ca-certificates zip unzip tar git jq $([[ "$TARGETPLATFORM" == "linux/arm64" && "$FEX_ENABLED" == true ]] && echo "squashfs-tools") $([[ "$TARGETPLATFORM" == "linux/amd64" ]] && echo "lib32stdc++6")
 
@@ -50,9 +50,9 @@ FROM base AS builder
 
 COPY OpenStarbound-ARM /OpenStarbound-ARM
 
-RUN --mount=type=cache,id=apt-$TARGETPLATFORM,sharing=locked,target=/var/cache/apt \
-    --mount=type=cache,id=apt-$TARGETPLATFORM,sharing=locked,target=/var/lib/apt \
-    --mount=type=cache,id=apt-$TARGETPLATFORM,sharing=locked,target=/var/cache/debconf \
+RUN --mount=type=cache,id=apt-trixie-$TARGETPLATFORM,sharing=locked,target=/var/cache/apt \
+    --mount=type=cache,id=apt-trixie-$TARGETPLATFORM,sharing=locked,target=/var/lib/apt \
+    --mount=type=cache,id=apt-trixie-$TARGETPLATFORM,sharing=locked,target=/var/cache/debconf \
     if [[ "$TARGETPLATFORM" == "linux/arm64" ]]; then \
         apt install -y build-essential cmake pkg-config libxmu-dev libxi-dev libgl-dev libglu1-mesa-dev libsdl2-dev python3-jinja2 ninja-build autoconf automake autoconf-archive libltdl-dev; \
     fi
@@ -78,9 +78,9 @@ RUN mkdir -p /{compile,output/fex}
 
 WORKDIR /compile
 
-RUN --mount=type=cache,id=apt-ubuntu-$TARGETPLATFORM,sharing=locked,target=/var/cache/apt \
-    --mount=type=cache,id=apt-ubuntu-$TARGETPLATFORM,sharing=locked,target=/var/lib/apt \
-    --mount=type=cache,id=apt-ubuntu-$TARGETPLATFORM,sharing=locked,target=/var/cache/debconf \
+RUN --mount=type=cache,id=apt-bookworm-$TARGETPLATFORM,sharing=locked,target=/var/cache/apt \
+    --mount=type=cache,id=apt-bookworm-$TARGETPLATFORM,sharing=locked,target=/var/lib/apt \
+    --mount=type=cache,id=apt-bookworm-$TARGETPLATFORM,sharing=locked,target=/var/cache/debconf \
     if [[ "$TARGETPLATFORM" == "linux/arm64" && "$FEX_ENABLED" == true ]]; then \
         apt update && \
         apt install -y git cmake lld clang llvm ninja-build pkg-config libsdl2-dev qtbase5-dev qtdeclarative5-dev && \
@@ -94,7 +94,7 @@ RUN --mount=type=cache,id=apt-ubuntu-$TARGETPLATFORM,sharing=locked,target=/var/
 
 FROM builder AS builder-box64
 
-RUN if [[ "$TARGETPLATFORM" == "linux/arm64" && ! "$FEX_ENABLED" == true ]]; then \
+RUN if [[ "$TARGETPLATFORM" == "linux/arm64" ]]; then \
         git clone --depth 1 https://github.com/ptitSeb/box64.git && \
         cd /compile/box64 && \
         cmake . -D ADLINK=1 -D ARM_DYNAREC=ON -D BOX32=ON -D BOX32_BINFMT=ON -D CMAKE_BUILD_TYPE=Release && \
@@ -171,11 +171,7 @@ RUN if [[ "$TARGETPLATFORM" == "linux/arm64" && "$FEX_ENABLED" == true ]]; then 
         if [[ ! "$FEX_ROOTFS_IN_TMP" == true ]]; then \
             FEXRootFSFetcher -y -x --distro-name=ubuntu --distro-version=24.04 && \
             rm /server/steamcmd/home/.fex-emu/RootFS/*.sqsh; \
-        fi && \
-        sed -i -r "s/box64\s/FEX /g" /server/starbound.sh; \
-    fi
-RUN if [[ "$TARGETPLATFORM" == "linux/amd64" ]]; then \
-        sed -i -r "s/box64\s/\.\//g" /server/starbound.sh; \
+        fi; \
     fi
 EXPOSE 21025/tcp
 STOPSIGNAL SIGINT
