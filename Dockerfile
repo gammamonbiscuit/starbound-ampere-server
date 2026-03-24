@@ -44,7 +44,7 @@ RUN --mount=type=cache,id=apt-trixie-$TARGETPLATFORM,sharing=locked,target=/var/
     --mount=type=cache,id=apt-trixie-$TARGETPLATFORM,sharing=locked,target=/var/lib/apt \
     --mount=type=cache,id=apt-trixie-$TARGETPLATFORM,sharing=locked,target=/var/cache/debconf \
     apt update && \
-    apt install -y --no-install-recommends curl ca-certificates zip unzip tar git jq $([[ "$TARGETPLATFORM" == "linux/arm64" && "$FEX_ENABLED" == true ]] && echo "squashfs-tools") $([[ "$TARGETPLATFORM" == "linux/amd64" ]] && echo "lib32stdc++6")
+    apt install -y --no-install-recommends curl ca-certificates zip unzip tar git jq squashfs-tools $([[ "$TARGETPLATFORM" == "linux/amd64" ]] && echo "lib32stdc++6")
 
 FROM base AS builder
 
@@ -81,7 +81,7 @@ WORKDIR /compile
 RUN --mount=type=cache,id=apt-bookworm-$TARGETPLATFORM,sharing=locked,target=/var/cache/apt \
     --mount=type=cache,id=apt-bookworm-$TARGETPLATFORM,sharing=locked,target=/var/lib/apt \
     --mount=type=cache,id=apt-bookworm-$TARGETPLATFORM,sharing=locked,target=/var/cache/debconf \
-    if [[ "$TARGETPLATFORM" == "linux/arm64" && "$FEX_ENABLED" == true ]]; then \
+    if [[ "$TARGETPLATFORM" == "linux/arm64" ]]; then \
         apt update && \
         apt install -y git cmake lld clang llvm ninja-build pkg-config libsdl2-dev qtbase5-dev qtdeclarative5-dev && \
         git clone --depth 1 --recurse-submodules https://github.com/FEX-Emu/FEX.git && \
@@ -167,7 +167,7 @@ COPY --chown=steam:steam --chmod=755 --from=builder-osb    /output/openstarbound
 COPY --chown=steam:steam --chmod=755 --from=builder-steam  /output/steamcmd      /server/steamcmd
 COPY --chown=steam:steam --chmod=755                       starbound.sh          /server/
 COPY --chown=steam:steam --chmod=755                       starbound.env         /server/data/
-RUN if [[ "$TARGETPLATFORM" == "linux/arm64" && "$FEX_ENABLED" == true ]]; then \
+RUN if [[ "$TARGETPLATFORM" == "linux/arm64" ]]; then \
         if [[ ! "$FEX_ROOTFS_IN_TMP" == true ]]; then \
             FEXRootFSFetcher -y -x --distro-name=ubuntu --distro-version=24.04 && \
             rm /server/steamcmd/home/.fex-emu/RootFS/*.sqsh; \
