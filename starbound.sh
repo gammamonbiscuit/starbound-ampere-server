@@ -20,7 +20,36 @@ for LOOP_PERMISSION_CHECK in "${PERMISSION_CHECK[@]}"; do
     fi
 done
 
-mkdir -m 755 -p /server/{backup,data,steamcmd/home,starbound/{assets,mods,storage,logs,steamapps}}
+mkdir -m 755 -p /server/{backup,data,steamcmd/home/.fex-emu,starbound/{assets,mods,storage,logs,steamapps}}
+
+# Decide how to run programs.
+if [[ "$TARGETPLATFORM" == "linux/amd64" ]]; then
+    RUNNER='./'
+else
+    if [[ "$TARGETPLATFORM" == "linux/amd64" ]]; then
+        RUNNER='FEX '
+    else
+        RUNNER='box64 '
+    fi
+fi
+
+# Download FEX's RootFS if it is not working.
+if [[ "$TARGETPLATFORM" == "linux/arm64" && "$FEX_ENABLED" == true && "$FEX_ROOTFS_IN_TMP" == true ]]; then
+    echo "🚧 Checking if FEX RootFS is valid"
+    FEX_ROOTFS_VALID=$(FEXBash exit 2>&1)
+    if [[ -z "$FEX_ROOTFS_VALID" ]]; then
+        echo "  ✔️ FEX is working"
+    else
+        echo "  ☁️ Initialising FEX RootFS..."
+        mkdir -p /tmp/RootFS
+        rm -rfv "/server/steamcmd/home/.fex-emu/RootFS"
+        ln -vfs "/tmp/RootFS" "/server/steamcmd/home/.fex-emu/RootFS"
+        FEXRootFSFetcher -y -x --distro-name=ubuntu --distro-version=24.04
+        rm /server/steamcmd/home/.fex-emu/RootFS/*.sqsh
+        # No retry, to avoid downloading the RootFS image from FEX's server again and again.
+        FEXBash exit || exit 1
+    fi
+fi
 
 if [[ ! -f "/server/data/starbound.env" ]]; then
     echo "🚧 Creating config file..."
@@ -37,6 +66,14 @@ OPENSTARBOUND=$OPENSTARBOUND
 # Starbound will be launched after all update operations (if any) are finished.
 # Default: true
 LAUNCH_GAME=$LAUNCH_GAME
+
+# Use FEX instead of box64 for x86_64 emulation.
+# Default: false
+FEX_ENABLED=$FEX_ENABLED
+
+# When set to ture, the rootfs is downloaded to (or loaded from) /tmp/RootFS during runtime, should not set to false unless the image is build with this disabled.
+# Default: true
+FEX_ROOTFS_IN_TMP=$FEX_ROOTFS_IN_TMP
 
 # Backup save data on start, before any update and game launch.
 # Default: true
@@ -149,11 +186,11 @@ if [[ $UPDATE_STEAM == true || $UPDATE_GAME == true || $UPDATE_WORKSHOP == true 
         tar zxvf "steamcmd_linux.tar.gz"
         rm "steamcmd_linux.tar.gz"
         # For some reason it needs to update twice?
-        box64 linux32/steamcmd $STEAM_SCRIPT_BASE +quit >/dev/null
+        ${RUNNER}linux32/steamcmd $STEAM_SCRIPT_BASE +quit >/dev/null
     else
         echo "🚧 Updating SteamCMD..."
     fi
-    box64 linux32/steamcmd $STEAM_SCRIPT_BASE +quit >/dev/null
+    ${RUNNER}linux32/steamcmd $STEAM_SCRIPT_BASE +quit >/dev/null
     find "package" -name "*.zip.*" -delete
     popd > /dev/null
 else
@@ -216,7 +253,7 @@ if [[ $UPDATE_GAME_BIN == true || $UPDATE_GAME_PAK_MAIN == true || $UPDATE_GAME_
             #   https://steamdb.info/depot/533833/
             # And the packed.pak:
             #   https://steamdb.info/depot/533831/
-            box64 steamcmd/linux32/steamcmd $STEAM_SCRIPT_BASE +login $STEAM_LOGIN +download_depot 533830 533833 +download_depot 533830 533831 +quit
+            ${RUNNER}steamcmd/linux32/steamcmd $STEAM_SCRIPT_BASE +login $STEAM_LOGIN +download_depot 533830 533833 +download_depot 533830 533831 +quit
             if [[ -d "/server/steamcmd/linux32/steamapps/content/app_533830/depot_533831/assets" && -d "/server/steamcmd/linux32/steamapps/content/app_533830/depot_533833/linux" ]]; then
                 # Create the original directory struture so we don't have to modify sbinit.config.
                 if [[ $UPDATE_GAME_PAK_MAIN == true ]]; then
@@ -342,7 +379,7 @@ if [[ $UPDATE_WORKSHOP == true ]]; then
                 # This will loop 1+WORKSHOP_MAX_RETRY times.
                 for ((LOOP_TEMP_WORKSHOP_RETRY = 0 ; LOOP_TEMP_WORKSHOP_RETRY <= WORKSHOP_MAX_RETRY ; LOOP_TEMP_WORKSHOP_RETRY++ )); do
                     rm -f "/server/steamcmd/home/Steam/logs/workshop_log.txt"
-                    box64 steamcmd/linux32/steamcmd $STEAM_SCRIPT_BASE +login anonymous $LOOP_TMP_WORKSHOP_SCRIPT +quit >/dev/null
+                    ${RUNNER}steamcmd/linux32/steamcmd $STEAM_SCRIPT_BASE +login anonymous $LOOP_TMP_WORKSHOP_SCRIPT +quit >/dev/null
                     # Sometimes SteamCMD can't even launch normally, if that's the case don't bother checking every mods and finish this loop right here.
                     if [[ ! -f "/server/steamcmd/home/Steam/logs/workshop_log.txt" ]]; then
                         echo "    ❌ Unable to download anything, retry $(($LOOP_TEMP_WORKSHOP_RETRY+1))/$WORKSHOP_MAX_RETRY in 30 seconds."
@@ -426,7 +463,7 @@ if [[ $LAUNCH_GAME == true ]]; then
     if [[ $OPENSTARBOUND == true ]]; then
         exec ./starbound_server
     else
-        exec box64 starbound_server
+        exec ${RUNNER}starbound_server
     fi
 else
     echo "👋 Adios"
