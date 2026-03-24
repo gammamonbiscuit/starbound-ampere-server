@@ -33,14 +33,14 @@ else
     fi
 fi
 
-# Download FEX-Emu's RootFS if it is not working.
+# Download FEX's RootFS if it is not working.
 if [[ "$TARGETPLATFORM" == "linux/arm64" && "$FEX_ENABLED" == true && "$FEX_ROOTFS_IN_TMP" == true ]]; then
-    echo "🚧 Checking if FEX-Emu RootFS is valid"
+    echo "🚧 Checking if FEX RootFS is valid"
     FEX_ROOTFS_VALID=$(FEXBash exit 2>&1)
     if [[ -z "$FEX_ROOTFS_VALID" ]]; then
-        echo "  ✔️ FEX-Emu is working"
+        echo "  ✔️ FEX is working"
     else
-        echo "  ☁️ Initialising FEX-Emu RootFS..."
+        echo "  ☁️ Initialising FEX RootFS..."
         mkdir -p /tmp/RootFS
         rm -rfv "/server/steamcmd/home/.fex-emu/RootFS"
         ln -vfs "/tmp/RootFS" "/server/steamcmd/home/.fex-emu/RootFS"
@@ -66,6 +66,14 @@ OPENSTARBOUND=$OPENSTARBOUND
 # Starbound will be launched after all update operations (if any) are finished.
 # Default: true
 LAUNCH_GAME=$LAUNCH_GAME
+
+# Use FEX instead of box64 for x86_64 emulation.
+# Default: false
+FEX_ENABLED=$FEX_ENABLED
+
+# When set to ture, the rootfs is downloaded to (or loaded from) /tmp/RootFS during runtime, should not set to false unless the image is build with this disabled.
+# Default: true
+FEX_ROOTFS_IN_TMP=$FEX_ROOTFS_IN_TMP
 
 # Backup save data on start, before any update and game launch.
 # Default: true

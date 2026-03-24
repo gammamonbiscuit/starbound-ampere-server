@@ -35,16 +35,18 @@ This [docker-compose.yml](/docker-compose.yml) example only mounts some user ser
 
 | Container Path | Info |
 |:----|:----|
-| /server/starbound.sh        | Main script                                                |
-| /server/data/starbound.env  | Environment variables controlling the script’s behaviour   |
-| /server/steamcmd            | SteamCMD and everything used by it                         |
-| /server/starbound/mods      | All .pak mods and workshop mod symlinks                    |
-| /server/starbound/storage   | Save files                                                 |
-| /server/starbound/linux     | Starbound’s dedicated server program                       |
-| /server/starbound/assets    | Starbound’s packed.pak                                     |
-| /server/starbound/steamapps | Workshop mods                                              |
-| /server/openstarbound       | Pre-compiled OpenStarbound ARM build                       |
-| /server/backup              | Backup data                                                |
+| /server/starbound.sh                  | Main script                                                    |
+| /server/data/starbound.env            | Environment variables controlling the script’s behaviour       |
+| /server/steamcmd                      | SteamCMD and everything used by it                             |
+| /server/steamcmd/home/.fex-emu/RootFS | FEX's rootfs location if `FEX_ROOTFS_IN_TMP` is set to `false` |
+| /server/starbound/mods                | All .pak mods and workshop mod symlinks                        |
+| /server/starbound/storage             | Save files                                                     |
+| /server/starbound/linux               | Starbound’s dedicated server program                           |
+| /server/starbound/assets              | Starbound’s packed.pak                                         |
+| /server/starbound/steamapps           | Workshop mods                                                  |
+| /server/openstarbound                 | Pre-compiled OpenStarbound ARM build                           |
+| /server/backup                        | Backup data                                                    |
+| /tmp/RootFS                           | FEX's rootfs location if `FEX_ROOTFS_IN_TMP` is set to `true`  |
 
 ## Steam Guard and packed.pak
 You do not need to disable Steam Guard if you have mobile authenticator enabled. Steam will use an interactive notification in the app to let you proceed with the login request, it might ask you few more questions if you are logging in from an unusual location, for example, a VPS in another country.
@@ -68,6 +70,8 @@ These variables should be modified in `starbound.env` instead of `docker-compose
 | `STEAM_LOGIN`           | `"anonymous"` | `"myusername mypassword"` | Your Steam credentials, required to download the game, workshop mods are always downloaded anonymously.                                                               |
 | `OPENSTARBOUND`         | `true`        | `false`                   | To use OpenStarbound instead of vanilla Starbound, however you still have to use Steam to download (or provide your own copy of) `packed.pak` .                       |
 | `LAUNCH_GAME`           | `true`        | `false`                   | Starbound will be launched after all update operations (if any) are finished.                                                                                         |
+| `FEX_ENABLED`           | `false`       | `true`                    | Use FEX instead of box64 for x86_64 emulation.                                                                                                                        |
+| `FEX_ROOTFS_IN_TMP`     | `true`        | `false`                   | When set to `true`, the rootfs is downloaded to (or loaded from) /tmp/RootFS during runtime, should not set to `false` unless the image is build with this disabled.  |
 | `BACKUP_ENABLED`        | `true`        | `false`                   | Backup save data on start, before any update and game launch.                                                                                                         |
 | `BACKUP_VERSIONS`       | `10`          | `5`                       | Decides how many copies of backup data will be kept.                                                                                                                  |
 | `BACKUP_COOLDOWN`       | `1800`        | `3600`                    | Number of seconds that must be passed before a backup task can run again, this is to prevent backups being overwritten by broken repeatedly restarting container.     |
@@ -99,3 +103,7 @@ https://github.com/OpenStarbound/OpenStarbound/pull/263
 Box64
 
 https://github.com/ptitSeb/box64
+
+FEX
+
+https://github.com/FEX-Emu/FEX
