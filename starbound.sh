@@ -380,12 +380,6 @@ if [[ $UPDATE_WORKSHOP == true ]]; then
                 for ((LOOP_TEMP_WORKSHOP_RETRY = 0 ; LOOP_TEMP_WORKSHOP_RETRY <= WORKSHOP_MAX_RETRY ; LOOP_TEMP_WORKSHOP_RETRY++ )); do
                     rm -f "/server/steamcmd/home/Steam/logs/workshop_log.txt"
                     ${RUNNER}steamcmd/linux32/steamcmd $STEAM_SCRIPT_BASE +login anonymous $LOOP_TMP_WORKSHOP_SCRIPT +quit >/dev/null
-                    # Sometimes SteamCMD can't even launch normally, if that's the case don't bother checking every mods and finish this loop right here.
-                    if [[ ! -f "/server/steamcmd/home/Steam/logs/workshop_log.txt" ]]; then
-                        echo "    ❌ Unable to download anything, retry $(($LOOP_TEMP_WORKSHOP_RETRY+1))/$WORKSHOP_MAX_RETRY in 30 seconds."
-                        sleep 30
-                        continue
-                    fi
                     # Check if this group is downloaded successfully, mark down the unsuccessful ones.
                     for LOOP_TMP_WORKSHOP_ID_ITEM in ${LOOP_TMP_WORKSHOP_ID//,/ }; do
                         if grep -swq "Download item $LOOP_TMP_WORKSHOP_ID_ITEM result \: OK" "/server/steamcmd/home/Steam/logs/workshop_log.txt"; then
