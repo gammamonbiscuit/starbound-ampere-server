@@ -114,7 +114,7 @@ RUN if [[ "$TARGETPLATFORM" == "linux/arm64" ]]; then \
         cat x64-linux-mixed.cmake | sed -r '/\"\-DOPUS\_X86.*?\"/d;/discord/,/endif/d;s/ARCHITECTURE\sx64/ARCHITECTURE arm64/;s/(VCPKG_CMAKE_CONFIGURE_OPTIONS)/\1\n    \"-DOPUS_ARM_MAY_HAVE_NEON=ON\"\n    \"-DOPUS_ARM_MAY_HAVE_NEON_INTR=ON\"/' >./arm64-linux-mixed.cmake && \
         cat arm64-linux-mixed.cmake | sed -r 's/(set\(VCPKG_CMAKE_SYSTEM_NAME Linux\))/\1\nset(VCPKG_CHAINLOAD_TOOLCHAIN_FILE ${CMAKE_CURRENT_LIST_DIR}\/..\/toolchains\/linux-clang.cmake)/' >arm64-linux-mixed-clang.cmake && \
         cd /compile/OpenStarbound/source && \
-        cat CMakePresets.json | jq '. + {"testPresets": .testPresets | walk( if type == "string" then sub("linux";"linux-arm") else . end )} + {"buildPresets": .buildPresets | walk( if type == "string" then sub("linux";"linux-arm") else . end )} + {"configurePresets": .configurePresets | walk( if type == "string" then sub("(?<x>(^|[^-]))linux(?<y>[^\/])";"\(.x)linux-arm\(.y)") | sub("x64";"arm64") | sub("RelWithDebInfo";"Release") else . end ) } | del(.configurePresets.[], .buildPresets.[], .testPresets.[] | select(.hidden != true) | select(.name | startswith("linux") | not)) | .configurePresets.[].cacheVariables.STAR_ENABLE_STEAM_INTEGRATION = false | .configurePresets.[].cacheVariables.STAR_ENABLE_DISCORD_INTEGRATION = false' >CMakePresets.json.tmp && \
+        cat CMakePresets.json | jq '. + {"testPresets": .testPresets | walk( if type == "string" then sub("linux";"linux-arm") else . end )} + {"buildPresets": .buildPresets | walk( if type == "string" then sub("linux";"linux-arm") else . end )} + {"configurePresets": .configurePresets | walk( if type == "string" then sub("(?<x>(^|[^-]))linux(?<y>[^\/])";"\(.x)linux-arm\(.y)") | sub("x64";"arm64") | sub("RelWithDebInfo";"Release") else . end ) } | del(.configurePresets.[], .buildPresets.[], .testPresets.[] | select(.hidden != true) | select(.name | startswith("linux") | not )) | .configurePresets.[].cacheVariables.STAR_ENABLE_STEAM_INTEGRATION = false | .configurePresets.[].cacheVariables.STAR_ENABLE_DISCORD_INTEGRATION = false' >CMakePresets.json.tmp && \
         mv -f CMakePresets.json.tmp CMakePresets.json && \
         cmake --preset=linux-arm-release; \
     fi
@@ -169,11 +169,9 @@ COPY --chown=steam:steam --chmod=755 --from=builder-osb    /output/openstarbound
 COPY --chown=steam:steam --chmod=755 --from=builder-steam  /output/steamcmd      /server/steamcmd
 COPY --chown=steam:steam --chmod=755                       starbound.sh          /server/
 COPY --chown=steam:steam --chmod=755                       starbound.env         /server/data/
-RUN if [[ "$TARGETPLATFORM" == "linux/arm64" ]]; then \
-        if [[ ! "$FEX_ROOTFS_IN_TMP" == true ]]; then \
-            FEXRootFSFetcher -y -x --distro-name=ubuntu --distro-version=24.04 && \
-            rm /server/steamcmd/home/.fex-emu/RootFS/*.sqsh; \
-        fi; \
+RUN if [[ "$TARGETPLATFORM" == "linux/arm64" && ! "$FEX_ROOTFS_IN_TMP" == true ]]; then \
+        FEXRootFSFetcher -y -x --distro-name=ubuntu --distro-version=24.04 && \
+        rm /server/steamcmd/home/.fex-emu/RootFS/*.sqsh; \
     fi
 EXPOSE 21025/tcp
 STOPSIGNAL SIGINT
