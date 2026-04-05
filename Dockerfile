@@ -110,6 +110,8 @@ RUN if [[ "$TARGETPLATFORM" == "linux/arm64" ]]; then \
 
 RUN if [[ "$TARGETPLATFORM" == "linux/arm64" ]]; then \
         git clone --depth 1 --branch ${OPENSTARBOUND_VERSION:-main} https://github.com/OpenStarbound/OpenStarbound.git && \
+        cd /compile/OpenStarbound/cmake && \
+        sed -i -r 's/(\#elif\sdefined\(__arm64__\))/\1 || defined(__aarch64__)/' TargetArch.cmake && \
         cd /compile/OpenStarbound/triplets && \
         cat x64-linux-mixed.cmake | sed -r '/\"\-DOPUS\_X86.*?\"/d;/discord/,/endif/d;s/ARCHITECTURE\sx64/ARCHITECTURE arm64/;s/(VCPKG_CMAKE_CONFIGURE_OPTIONS)/\1\n    \"-DOPUS_ARM_MAY_HAVE_NEON=ON\"\n    \"-DOPUS_ARM_MAY_HAVE_NEON_INTR=ON\"/' >./arm64-linux-mixed.cmake && \
         cat arm64-linux-mixed.cmake | sed -r 's/(set\(VCPKG_CMAKE_SYSTEM_NAME Linux\))/\1\nset(VCPKG_CHAINLOAD_TOOLCHAIN_FILE ${CMAKE_CURRENT_LIST_DIR}\/..\/toolchains\/linux-clang.cmake)/' >arm64-linux-mixed-clang.cmake && \
