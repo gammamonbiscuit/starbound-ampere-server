@@ -22,35 +22,6 @@ done
 
 mkdir -m 755 -p /server/{backup,data,steamcmd/home/.fex-emu,starbound/{assets,mods,storage,logs,steamapps}}
 
-# Decide how to run programs.
-if [[ "$TARGETPLATFORM" == "linux/amd64" ]]; then
-    RUNNER='./'
-else
-    if [[ "$TARGETPLATFORM" == "linux/amd64" ]]; then
-        RUNNER='FEX '
-    else
-        RUNNER='box64 '
-    fi
-fi
-
-# Download FEX's RootFS if it is not working.
-if [[ "$TARGETPLATFORM" == "linux/arm64" && "$FEX_ENABLED" == true && "$FEX_ROOTFS_IN_TMP" == true ]]; then
-    echo "🚧 Checking if FEX RootFS is valid"
-    FEX_ROOTFS_VALID=$(FEXBash exit 2>&1)
-    if [[ -z "$FEX_ROOTFS_VALID" ]]; then
-        echo "  ✔️ FEX is working"
-    else
-        echo "  ☁️ Initialising FEX RootFS..."
-        mkdir -p /tmp/RootFS
-        rm -rfv "/server/steamcmd/home/.fex-emu/RootFS"
-        ln -vfs "/tmp/RootFS" "/server/steamcmd/home/.fex-emu/RootFS"
-        FEXRootFSFetcher -y -x --distro-name=ubuntu --distro-version=24.04
-        rm /server/steamcmd/home/.fex-emu/RootFS/*.sqsh
-        # No retry, to avoid downloading the RootFS image from FEX's server again and again.
-        FEXBash exit || exit 1
-    fi
-fi
-
 if [[ ! -f "/server/data/starbound.env" ]]; then
     echo "🚧 Creating config file..."
     tee "/server/data/starbound.env" <<EOF >/dev/null
@@ -139,6 +110,37 @@ EOF
 else
     echo "🚧 Reading config file..."
     source "/server/data/starbound.env"
+fi
+
+# Decide how to run programs.
+if [[ "$TARGETPLATFORM" == "linux/amd64" ]]; then
+    RUNNER='./'
+    echo "🚧 x86"
+else
+    if [[ "$FEX_ENABLED" == true ]]; then
+        RUNNER='FEX '
+    else
+        RUNNER='box64 '
+    fi
+    echo "🚧 arm64, ${RUNNER}"
+fi
+
+# Download FEX's RootFS if it is not working.
+if [[ "$TARGETPLATFORM" == "linux/arm64" && "$FEX_ENABLED" == true && "$FEX_ROOTFS_IN_TMP" == true ]]; then
+    echo "🚧 Checking if FEX RootFS is valid"
+    FEX_ROOTFS_VALID=$(FEXBash exit 2>&1)
+    if [[ -z "$FEX_ROOTFS_VALID" ]]; then
+        echo "  ✔️ FEX is working"
+    else
+        echo "  ☁️ Initialising FEX RootFS..."
+        mkdir -p /tmp/RootFS
+        rm -rfv "/server/steamcmd/home/.fex-emu/RootFS"
+        ln -vfs "/tmp/RootFS" "/server/steamcmd/home/.fex-emu/RootFS"
+        FEXRootFSFetcher -y -x --distro-name=ubuntu --distro-version=24.04
+        rm /server/steamcmd/home/.fex-emu/RootFS/*.sqsh
+        # No retry, to avoid downloading the RootFS image from FEX's server again and again.
+        FEXBash exit || exit 1
+    fi
 fi
 
 if [[ $OPENSTARBOUND == true ]]; then
