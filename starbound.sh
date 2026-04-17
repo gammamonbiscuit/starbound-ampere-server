@@ -42,10 +42,6 @@ LAUNCH_GAME=$LAUNCH_GAME
 # Default: false
 FEX_ENABLED=$FEX_ENABLED
 
-# When set to ture, the rootfs is downloaded to (or loaded from) /tmp/RootFS during runtime, should not set to false unless the image is build with this disabled.
-# Default: true
-FEX_ROOTFS_IN_TMP=$FEX_ROOTFS_IN_TMP
-
 # Backup save data on start, before any update and game launch.
 # Default: true
 BACKUP_ENABLED=$BACKUP_ENABLED
@@ -123,24 +119,6 @@ else
         RUNNER='box64 '
     fi
     echo "🚧 arm64, ${RUNNER}"
-fi
-
-# Download FEX's RootFS if it is not working.
-if [[ "$TARGETPLATFORM" == "linux/arm64" && "$FEX_ENABLED" == true && "$FEX_ROOTFS_IN_TMP" == true ]]; then
-    echo "🚧 Checking if FEX RootFS is valid"
-    FEX_ROOTFS_VALID=$(FEXBash exit 2>&1)
-    if [[ -z "$FEX_ROOTFS_VALID" ]]; then
-        echo "  ✔️ FEX is working"
-    else
-        echo "  ☁️ Initialising FEX RootFS..."
-        mkdir -p /tmp/RootFS
-        rm -rfv "/server/steamcmd/home/.fex-emu/RootFS"
-        ln -vfs "/tmp/RootFS" "/server/steamcmd/home/.fex-emu/RootFS"
-        FEXRootFSFetcher -y -x --distro-name=ubuntu --distro-version=24.04
-        rm /server/steamcmd/home/.fex-emu/RootFS/*.sqsh
-        # No retry, to avoid downloading the RootFS image from FEX's server again and again.
-        FEXBash exit || exit 1
-    fi
 fi
 
 if [[ $OPENSTARBOUND == true ]]; then

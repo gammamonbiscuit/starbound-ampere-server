@@ -23,7 +23,6 @@ ENV OPENSTARBOUND_VERSION=v0.1.14 \
     WORKSHOP_PRUNE=true \
     WORKSHOP_MAX_RETRY=3 \
     FEX_ENABLED=false \
-    FEX_ROOTFS_IN_TMP=true \
     BOX64_LOG=0 \
     BOX64_NOBANNER=1 \
     BOX64_DYNAREC_STRONGMEM=1 \
@@ -52,7 +51,7 @@ RUN --mount=type=cache,id=apt-trixie-$TARGETPLATFORM,sharing=locked,target=/var/
     --mount=type=cache,id=apt-trixie-$TARGETPLATFORM,sharing=locked,target=/var/lib/apt \
     --mount=type=cache,id=apt-trixie-$TARGETPLATFORM,sharing=locked,target=/var/cache/debconf \
     if [[ "$TARGETPLATFORM" == "linux/arm64" ]]; then \
-        apt install -y build-essential cmake pkg-config libxmu-dev libxi-dev libgl-dev libglu1-mesa-dev libsdl2-dev python3-jinja2 ninja-build autoconf automake autoconf-archive libltdl-dev; \
+        apt install -y build-essential cmake pkg-config libxmu-dev libxi-dev libgl-dev libglu1-mesa-dev libsdl2-dev python3-jinja2 ninja-build autoconf automake autoconf-archive libltdl-dev qemu-user-static; \
     fi
 
 RUN mkdir -p /{compile,output/{steamcmd,box64,openstarbound}}
@@ -89,6 +88,21 @@ RUN --mount=type=cache,id=apt-bookworm-$TARGETPLATFORM,sharing=locked,target=/va
         ninja -j$(nproc) && \
         mv /compile/FEX/Bin/* /output/fex; \
     fi
+
+FROM --platform=linux/amd64 debian:trixie-slim AS rootfs
+FROM builder AS builder-fex-rootfs
+
+COPY --from=rootfs / /output/rootfs
+
+WORKDIR /output/rootfs
+
+RUN chroot . apt update
+
+RUN chroot . apt install -y lib32gcc-s1
+
+RUN rm -rf boot dev home media mnt proc root srv tmp sys opt var/cache/apt var/lib/apt var/lib/dpkg && \
+    cd etc && \
+    rm -f hosts resolv.conf timezone localtime passwd
 
 FROM builder AS builder-box64
 
@@ -169,16 +183,14 @@ RUN mkdir -m 755 -p /server/{backup,data,steamcmd/home/.fex-emu,starbound/{asset
 
 USER steam
 WORKDIR /server
-COPY --chown=root:root   --chmod=755 --from=builder-fex    /output/fex           /usr/bin/
-COPY --chown=root:root   --chmod=755 --from=builder-box64  /output/box64         /
-COPY --chown=steam:steam --chmod=755 --from=builder-osb    /output/openstarbound /server/openstarbound
-COPY --chown=steam:steam --chmod=755 --from=builder-steam  /output/steamcmd      /server/steamcmd
-COPY --chown=steam:steam --chmod=755                       starbound.sh          /server/
-COPY --chown=steam:steam --chmod=755                       starbound.env         /server/data/
-RUN if [[ "$TARGETPLATFORM" == "linux/arm64" && ! "$FEX_ROOTFS_IN_TMP" == true ]]; then \
-        FEXRootFSFetcher -y -x --distro-name=ubuntu --distro-version=24.04 && \
-        rm /server/steamcmd/home/.fex-emu/RootFS/*.sqsh; \
-    fi
+COPY --chown=root:root   --chmod=755 --from=builder-fex           /output/fex           /usr/bin
+COPY --chown=root:root   --chmod=755 --from=builder-fex-rootfs    /output/rootfs        /server/rootfs
+COPY --chown=root:root   --chmod=755 --from=builder-box64         /output/box64         /
+COPY --chown=steam:steam --chmod=755 --from=builder-osb           /output/openstarbound /server/openstarbound
+COPY --chown=steam:steam --chmod=755 --from=builder-steam         /output/steamcmd      /server/steamcmd
+COPY --chown=steam:steam --chmod=755                              starbound.sh          /server/
+COPY --chown=steam:steam --chmod=755                              starbound.env         /server/data/
+RUN echo '{"Config":{"RootFS":"/server/rootfs"}}' >/server/steamcmd/home/.fex-emu/Config.json
 EXPOSE 21025/tcp
 STOPSIGNAL SIGINT
 ENTRYPOINT ["/bin/bash", "-c"]
