@@ -94,15 +94,17 @@ FROM builder AS builder-fex-rootfs
 
 COPY --from=rootfs / /output/rootfs
 
-WORKDIR /output/rootfs
-
-RUN chroot . apt update
-
-RUN chroot . apt install -y lib32gcc-s1
-
-RUN rm -rf boot dev home media mnt proc root srv tmp sys opt var/cache/apt var/lib/apt var/lib/dpkg && \
-    cd etc && \
-    rm -f hosts resolv.conf timezone localtime passwd
+RUN if [[ "$TARGETPLATFORM" == "linux/arm64" ]]; then \
+        cd /output/rootfs && \
+        chroot . apt update && \
+        chroot . apt install -y lib32gcc-s1 && \
+        rm -rf boot dev home media mnt proc root srv tmp sys opt var/cache/apt var/lib/apt var/lib/dpkg && \
+        cd etc && \
+        rm -f hosts resolv.conf timezone localtime passwd; \
+    else \
+        rm -rf /output/rootfs && \
+        mkdir /output/rootfs; \
+    fi
 
 FROM builder AS builder-box64
 
