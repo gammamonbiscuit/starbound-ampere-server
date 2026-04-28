@@ -4,7 +4,7 @@ ARG TARGETPLATFORM \
     DEBIAN_FRONTEND=noninteractive \
     VCPKG_ROOT=/compile/vcpkg
 
-ENV OPENSTARBOUND_VERSION=v0.1.14 \
+ENV OPENSTARBOUND_VERSION= \
     OPENSTARBOUND=true \
     STEAM_LOGIN="anonymous" \
     LAUNCH_GAME=true \
@@ -119,12 +119,33 @@ RUN if [[ "$TARGETPLATFORM" == "linux/arm64" ]]; then \
 FROM builder AS builder-osb
 
 RUN if [[ "$TARGETPLATFORM" == "linux/arm64" ]]; then \
+        if [[ -z "$OPENSTARBOUND_VERSION" ]]; then \
+            ASSETS=https://nightly.link/OpenStarbound/OpenStarbound/workflows/build/main; \
+        else \
+            ASSETS=https://github.com/OpenStarbound/OpenStarbound/releases/download/${OPENSTARBOUND_VERSION}; \
+        fi && \
+        curl -L -O "${ASSETS}/OpenStarbound-Linux-ARM-Clang-{Server,Client}.zip" && \
+        if [[ $(head -c 2 OpenStarbound-Linux-ARM-Clang-Server.zip) == "PK" && $(head -c 2 OpenStarbound-Linux-ARM-Clang-Client.zip) == "PK" ]]; then \
+            unzip "OpenStarbound-Linux-ARM-Clang-*.zip" && \
+            if [[ -f "server.tar" && -f "client.tar" ]]; then \
+                tar xvf "server.tar" && \
+                tar xvf "client.tar" && \
+                mv server_distribution/* /output/openstarbound/ && \
+                mv client_distribution/linux/asset_packer client_distribution/linux/asset_unpacker /output/openstarbound/linux/ && \
+                rm /output/openstarbound/mods/mods_go_here; \
+            else \
+                exit 1; \
+            fi; \
+        fi; \
+    fi
+
+RUN if [[ "$TARGETPLATFORM" == "linux/arm64" && ! $(compgen -G "/output/openstarbound/linux/starbound_server") ]]; then \
         git clone --depth 1 https://github.com/microsoft/vcpkg.git && \
         cd /compile/vcpkg && \
         ./bootstrap-vcpkg.sh -disableMetrics; \
     fi
 
-RUN if [[ "$TARGETPLATFORM" == "linux/arm64" ]]; then \
+RUN if [[ "$TARGETPLATFORM" == "linux/arm64" && ! $(compgen -G "/output/openstarbound/linux/starbound_server") ]]; then \
         git clone --depth 1 --branch ${OPENSTARBOUND_VERSION:-main} https://github.com/OpenStarbound/OpenStarbound.git && \
         if [[ $(compgen -G "/compile/OpenStarbound/triplets/arm64-linux-mixed*") ]]; then \
             cd /compile/OpenStarbound/source; \
@@ -141,7 +162,7 @@ RUN if [[ "$TARGETPLATFORM" == "linux/arm64" ]]; then \
         cmake --preset=linux-arm-release; \
     fi
 
-RUN if [[ "$TARGETPLATFORM" == "linux/arm64" ]]; then \
+RUN if [[ "$TARGETPLATFORM" == "linux/arm64" && ! $(compgen -G "/output/openstarbound/linux/starbound_server") ]]; then \
         cd /compile/OpenStarbound/build/linux-arm-release && \
         cmake --build . --parallel $(nproc) && \
         cd /compile/OpenStarbound && \
