@@ -9,12 +9,12 @@ This is my attempt on running Starbound dedicated server in an Oracle Ampere A1 
 
 ## Features
 1. Multi-arch Starbound dedicated server
-     - Vanilla Starbound in arm64 is emulated by box64 or FEX-Emu at your choice.
+     - Vanilla Starbound in arm64 is emulated by using box64 or FEX-Emu at your choice.
      - OpenStarbound has native arm64 support, older versions before that are compiled from source.
      - There are proberly hundreds of projects out there that can do this, if you only want a simple x86 server, theirs might be a better choice.
 2. Use manual mods (`*.pak`)
      - Native feature of Starbound, not much to talk about.
-     - You can use unpacked mods, but this script only handles the backup `*.pak` files, be aware if you want to include mods in your backup.
+     - You can use unpacked mods, but this script only handles the backup of `*.pak` files, be aware if you want to include mods in your backup.
 3. Use Steam workshop mods
      - Another common feature of similar projects...
      - This is achieved by using steamcmd’s `workshop_download_item` command, and then the script creates symlink to let the game read them.
