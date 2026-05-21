@@ -1,11 +1,29 @@
 # Starbound Ampere Server
-This is my attempt on running Starbound dedicated server in an Oracle Ampere A1 Compute instance, with OpenStarbound and Steam workshop mod support.
+This is my attempt on running Starbound dedicated server in an Oracle Ampere A1 Compute instance.
 
 >[!WARNING]
 >No docker image is available for download, you have to build it yourself,
 >I made this only to let myself host Starbound in this very specific instance and play with my friends,
 >I **do not** guarantee that this will work on your machine.
 >**No support will be provided!**
+
+## Features
+1. Multi-arch Starbound dedicated server
+     - Vanilla Starbound in arm64 is emulated by box64 or FEX-Emu at your choice.
+     - OpenStarbound has native arm64 support, older versions before that are compiled from source.
+     - There are proberly hundreds of projects out there that can do this, if you only want a simple x86 server, theirs might be a better choice.
+2. Use manual mods (`*.pak`)
+     - Native feature of Starbound, not much to talk about.
+     - You can use unpacked mods, but this script only handles the backup `*.pak` files, be aware if you want to include mods in your backup.
+3. Use Steam workshop mods
+     - Another common feature of similar projects...
+     - This is achieved by using steamcmd’s `workshop_download_item` command, and then the script creates symlink to let the game read them.
+4. Use Steam workshop collection mods
+     - Very convenient if you use workshop collections to manage your mods, you can even combine multiple collections.
+     - The script uses Steamworks web API `ISteamRemoteStorage/GetCollectionDetails` to get workshop item ids from the collection ids you provided.
+5. Backup data at launch
+     - Backups your universe into a `*.zip` file before starting the server, useful if you accidentally dropped a nuke in your base.
+     - Able to keep multiple versions, what if this is combined with some external script handling auto server restart...
 
 ## Build
 ```bash
