@@ -49,21 +49,26 @@ services:
     restart: unless-stopped
 ```
 
-This [docker-compose.yml](/docker-compose.yml) example only mounts some user serviceable paths, but if you have more needs, here are some info about the `/server` directory:
+This [docker-compose.yml](/docker-compose.yml) example only mounts some user serviceable paths, but if you have more needs, here's the directory tree:
 
-| Container Path | Info |
-|:----|:----|
-| /server/starbound.sh                  | Main script                                                    |
-| /server/data/starbound.env            | Environment variables controlling the script’s behaviour       |
-| /server/steamcmd                      | SteamCMD and everything used by it                             |
-| /server/starbound/mods                | All .pak mods and workshop mod symlinks                        |
-| /server/starbound/storage             | Save files                                                     |
-| /server/starbound/linux               | Starbound’s dedicated server program                           |
-| /server/starbound/assets              | Starbound’s packed.pak                                         |
-| /server/starbound/steamapps           | Workshop mods                                                  |
-| /server/openstarbound                 | Pre-compiled OpenStarbound ARM build                           |
-| /server/backup                        | Backup data                                                    |
-| /server/rootfs                        | FEX's rootfs location                                          |
+```
+/server                 # The container's working directory
+|-- backup              # Backup data
+|-- data
+|   `-- starbound.env   # Environment variables controlling the script’s behaviour
+|-- openstarbound       # Pre-compiled OpenStarbound ARM build
+|-- rootfs              # FEX's rootfs location
+|-- starbound
+|   |-- assets          # Starbound and OpenStarbound's assets
+|   |-- linux           # Game server binaries
+|   |-- logs            # Game logs (OpenStarbound)
+|   |-- mods            # All .pak mods and workshop mod symlinks
+|   |-- steamapps       # Workshop mods' download location
+|   `-- storage         # Save files / game logs (Vanilla Starbound)
+|-- starbound.sh        # Main script
+`-- steamcmd            # SteamCMD binaries
+    `-- home            # The container user's home directory, steamcmd logs are here
+```
 
 ## Steam Guard and packed.pak
 You do not need to disable Steam Guard if you have mobile authenticator enabled. Steam will use an interactive notification in the app to let you proceed with the login request, it might ask you few more questions if you are logging in from an unusual location, for example, a VPS in another country.
