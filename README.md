@@ -2,6 +2,9 @@
 This is my attempt on running Starbound dedicated server in an Oracle Ampere A1 Compute instance.
 
 >[!WARNING]
+>Downloading from nightly.link is [currently not available](https://github.com/OpenStarbound/OpenStarbound/issues/538), file structure also slightly changed. At this moment, the script would download v0.1.14 release for x86, and fall back to build from source for arm64.
+
+>[!WARNING]
 >No docker image is available for download, you have to build it yourself,
 >I made this only to let myself host Starbound in this very specific instance and play with my friends,
 >I **do not** guarantee that this will work on your machine.

@@ -180,7 +180,7 @@ RUN if [[ "$TARGETPLATFORM" == "linux/arm64" && ! $(compgen -G "/output/openstar
 
 RUN if [[ "$TARGETPLATFORM" == "linux/amd64" ]]; then \
         if [[ -z "$OPENSTARBOUND_VERSION" ]]; then \
-            ASSETS=https://nightly.link/OpenStarbound/OpenStarbound/workflows/build/main; \
+            ASSETS=https://github.com/OpenStarbound/OpenStarbound/releases/download/v0.1.14; \
         else \
             ASSETS=https://github.com/OpenStarbound/OpenStarbound/releases/download/${OPENSTARBOUND_VERSION}; \
         fi && \
