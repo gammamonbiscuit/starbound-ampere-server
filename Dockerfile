@@ -51,7 +51,7 @@ RUN --mount=type=cache,id=apt-trixie-$TARGETPLATFORM,sharing=locked,target=/var/
     --mount=type=cache,id=apt-trixie-$TARGETPLATFORM,sharing=locked,target=/var/lib/apt \
     --mount=type=cache,id=apt-trixie-$TARGETPLATFORM,sharing=locked,target=/var/cache/debconf \
     if [[ "$TARGETPLATFORM" == "linux/arm64" ]]; then \
-        apt install -y build-essential cmake pkg-config libxmu-dev libxi-dev libgl-dev libglu1-mesa-dev libsdl2-dev python3-jinja2 ninja-build autoconf automake autoconf-archive libltdl-dev qemu-user-static xxd; \
+        apt install -y build-essential cmake pkg-config libxmu-dev libxi-dev libgl-dev libglu1-mesa-dev libsdl2-dev python3-jinja2 ninja-build autoconf automake autoconf-archive libltdl-dev qemu-user-static xxd libtool; \
     fi
 
 RUN mkdir -p /{compile,output/{steamcmd,box64,openstarbound}}
