@@ -51,7 +51,7 @@ RUN --mount=type=cache,id=apt-trixie-$TARGETPLATFORM,sharing=locked,target=/var/
     --mount=type=cache,id=apt-trixie-$TARGETPLATFORM,sharing=locked,target=/var/lib/apt \
     --mount=type=cache,id=apt-trixie-$TARGETPLATFORM,sharing=locked,target=/var/cache/debconf \
     if [[ "$TARGETPLATFORM" == "linux/arm64" ]]; then \
-        apt install -y build-essential cmake pkg-config libxmu-dev libgl-dev libglu1-mesa-dev libsdl2-dev python3-jinja2 ninja-build autoconf automake autoconf-archive libltdl-dev qemu-user-static xxd libtool libasound2-dev libpulse-dev libaudio-dev libfribidi-dev libjack-dev libsndio-dev libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev libxss-dev libxtst-dev libxkbcommon-dev libdrm-dev libgbm-dev libgl1-mesa-dev libgles2-mesa-dev libegl1-mesa-dev libdbus-1-dev libibus-1.0-dev libudev-dev libthai-dev libusb-1.0-0-dev libpipewire-0.3-dev libwayland-dev libdecor-0-dev liburing-dev; \
+        apt install -y build-essential cmake pkg-config libxmu-dev libgl-dev libglu1-mesa-dev libsdl2-dev python3-jinja2 ninja-build autoconf automake autoconf-archive libltdl-dev qemu-user-static xxd binutils libtool libasound2-dev libpulse-dev libaudio-dev libfribidi-dev libjack-dev libsndio-dev libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev libxss-dev libxtst-dev libxkbcommon-dev libdrm-dev libgbm-dev libgl1-mesa-dev libgles2-mesa-dev libegl1-mesa-dev libdbus-1-dev libibus-1.0-dev libudev-dev libthai-dev libusb-1.0-0-dev libpipewire-0.3-dev libwayland-dev libdecor-0-dev liburing-dev; \
     fi
 
 RUN mkdir -p /{compile,output/{steamcmd,box64,openstarbound}}
@@ -148,7 +148,8 @@ RUN if [[ "$TARGETPLATFORM" == "linux/arm64" && ! $(compgen -G "/output/openstar
 RUN if [[ "$TARGETPLATFORM" == "linux/arm64" && ! $(compgen -G "/output/openstarbound/linux/starbound_server") ]]; then \
         git clone --depth 1 --branch ${OPENSTARBOUND_VERSION:-main} https://github.com/OpenStarbound/OpenStarbound.git && \
         if [[ $(compgen -G "/compile/OpenStarbound/triplets/arm64-linux-mixed*") ]]; then \
-            cd /compile/OpenStarbound/source; \
+            cd /compile/OpenStarbound/source && \
+            sed -i -r 's/RelWithDebInfo/Release/g' CMakePresets.json; \
         else \
             cd /compile/OpenStarbound/cmake && \
             sed -i -r 's/(\#elif\sdefined\(__arm64__\))/\1 || defined(__aarch64__)/' TargetArch.cmake && \
@@ -196,6 +197,12 @@ RUN if [[ "$TARGETPLATFORM" == "linux/amd64" ]]; then \
             exit 1; \
         fi \
     fi
+
+RUN cd /output/openstarbound/linux && \
+    strip -S starbound_server && \
+    strip -S btree_repacker && \
+    strip -S asset_packer && \
+    strip -S asset_unpacker
 
 FROM base AS final
 
