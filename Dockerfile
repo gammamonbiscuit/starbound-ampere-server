@@ -60,12 +60,10 @@ WORKDIR /compile
 
 FROM builder AS builder-steam
 
-RUN if [[ "$TARGETPLATFORM" == "$TARGETPLATFORM" ]]; then \
-        cd /output/steamcmd && \
-        curl -L -O "https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz" && \
-        tar zxvf "steamcmd_linux.tar.gz" && \
-        rm "steamcmd_linux.tar.gz"; \
-    fi
+RUN cd /output/steamcmd && \
+    curl -L -O "https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz" && \
+    tar zxvf "steamcmd_linux.tar.gz" && \
+    rm "steamcmd_linux.tar.gz"
 
 FROM init AS builder-fex
 
