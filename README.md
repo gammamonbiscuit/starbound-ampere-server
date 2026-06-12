@@ -58,6 +58,7 @@ This [docker-compose.yml](/docker-compose.yml) example only mounts some user ser
 /server                 # The container's working directory
 |-- backup              # Backup data
 |-- data
+|   |-- container.log   # Log file of the main script
 |   `-- starbound.env   # Environment variables controlling the script’s behaviour
 |-- openstarbound       # Pre-compiled OpenStarbound ARM build
 |-- rootfs              # FEX's rootfs location
