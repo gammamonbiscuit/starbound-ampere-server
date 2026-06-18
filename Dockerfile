@@ -2,7 +2,9 @@ FROM scratch AS init
 
 ARG TARGETPLATFORM \
     DEBIAN_FRONTEND=noninteractive \
-    VCPKG_ROOT=/compile/vcpkg
+    VCPKG_ROOT=/compile/vcpkg \
+    CC=clang \
+    CXX=clang++
 
 ENV OPENSTARBOUND_VERSION= \
     OPENSTARBOUND=true \
@@ -52,7 +54,7 @@ RUN --mount=type=cache,id=apt-trixie-$TARGETPLATFORM,sharing=locked,target=/var/
     --mount=type=cache,id=apt-trixie-$TARGETPLATFORM,sharing=locked,target=/var/cache/debconf \
     apt install -y binutils && \
     if [[ "$TARGETPLATFORM" == "linux/arm64" ]]; then \
-        apt install -y build-essential cmake pkg-config libxmu-dev libgl-dev libglu1-mesa-dev libsdl2-dev python3-jinja2 ninja-build autoconf automake autoconf-archive libltdl-dev qemu-user-static xxd libtool libasound2-dev libpulse-dev libaudio-dev libfribidi-dev libjack-dev libsndio-dev libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev libxss-dev libxtst-dev libxkbcommon-dev libdrm-dev libgbm-dev libgl1-mesa-dev libgles2-mesa-dev libegl1-mesa-dev libdbus-1-dev libibus-1.0-dev libudev-dev libthai-dev libusb-1.0-0-dev libpipewire-0.3-dev libwayland-dev libdecor-0-dev liburing-dev; \
+        apt install -y build-essential cmake clang pkg-config libxmu-dev libgl-dev libglu1-mesa-dev libsdl2-dev python3-jinja2 ninja-build autoconf automake autoconf-archive libltdl-dev qemu-user-static xxd libtool libasound2-dev libpulse-dev libaudio-dev libfribidi-dev libjack-dev libsndio-dev libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev libxss-dev libxtst-dev libxkbcommon-dev libdrm-dev libgbm-dev libgl1-mesa-dev libgles2-mesa-dev libegl1-mesa-dev libdbus-1-dev libibus-1.0-dev libudev-dev libthai-dev libusb-1.0-0-dev libpipewire-0.3-dev libwayland-dev libdecor-0-dev liburing-dev; \
     fi
 
 RUN mkdir -p /{compile,output/{steamcmd,box64,openstarbound}}
@@ -83,7 +85,7 @@ RUN --mount=type=cache,id=apt-bookworm-$TARGETPLATFORM,sharing=locked,target=/va
         git clone --depth 1 --recurse-submodules https://github.com/FEX-Emu/FEX.git && \
         cd /compile/FEX && \
         mkdir build && \
-        CC=clang CXX=clang++ cmake -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release -DUSE_LINKER=lld -DENABLE_LTO=True -DBUILD_TESTING=False -DENABLE_ASSERTIONS=False -G Ninja . && \
+        cmake -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release -DUSE_LINKER=lld -DENABLE_LTO=True -DBUILD_TESTING=False -DENABLE_ASSERTIONS=False -G Ninja . && \
         ninja -j$(nproc) && \
         mv /compile/FEX/Bin/* /output/fex; \
     fi
@@ -159,11 +161,11 @@ RUN if [[ "$TARGETPLATFORM" == "linux/arm64" && ! $(compgen -G "/output/openstar
             cat CMakePresets.json | jq '. + {"testPresets": .testPresets | walk( if type == "string" then sub("linux";"linux-arm") else . end )} + {"buildPresets": .buildPresets | walk( if type == "string" then sub("linux";"linux-arm") else . end )} + {"configurePresets": .configurePresets | walk( if type == "string" then sub("(?<x>(^|[^-]))linux(?<y>[^\/])";"\(.x)linux-arm\(.y)") | sub("x64";"arm64") | sub("RelWithDebInfo";"Release") else . end ) } | del(.configurePresets.[], .buildPresets.[], .testPresets.[] | select(.hidden != true) | select(.name | startswith("linux") | not )) | .configurePresets.[].cacheVariables.STAR_ENABLE_STEAM_INTEGRATION = false | .configurePresets.[].cacheVariables.STAR_ENABLE_DISCORD_INTEGRATION = false' >CMakePresets.json.tmp && \
             mv -f CMakePresets.json.tmp CMakePresets.json; \
         fi && \
-        cmake --preset=linux-arm-release; \
+        cmake --preset=linux-arm-release-clang; \
     fi
 
 RUN if [[ "$TARGETPLATFORM" == "linux/arm64" && ! $(compgen -G "/output/openstarbound/linux/starbound_server") ]]; then \
-        cd /compile/OpenStarbound/build/linux-arm-release && \
+        cd /compile/OpenStarbound/build/linux-arm-release-clang && \
         cmake --build . --parallel $(nproc) && \
         cd /compile/OpenStarbound && \
         mkdir -p /output/openstarbound/{assets,mods,linux} && \
