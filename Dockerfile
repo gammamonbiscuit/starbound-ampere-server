@@ -54,7 +54,7 @@ RUN --mount=type=cache,id=apt-trixie-$TARGETPLATFORM,sharing=locked,target=/var/
     --mount=type=cache,id=apt-trixie-$TARGETPLATFORM,sharing=locked,target=/var/cache/debconf \
     apt install -y binutils && \
     if [[ "$TARGETPLATFORM" == "linux/arm64" ]]; then \
-        apt install -y gh build-essential cmake clang pkg-config libxmu-dev libgl-dev libglu1-mesa-dev libsdl2-dev python3-jinja2 ninja-build autoconf automake autoconf-archive libltdl-dev qemu-user-static xxd libtool libasound2-dev libpulse-dev libaudio-dev libfribidi-dev libjack-dev libsndio-dev libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev libxss-dev libxtst-dev libxkbcommon-dev libdrm-dev libgbm-dev libgl1-mesa-dev libgles2-mesa-dev libegl1-mesa-dev libdbus-1-dev libibus-1.0-dev libudev-dev libthai-dev libusb-1.0-0-dev libpipewire-0.3-dev libwayland-dev libdecor-0-dev liburing-dev; \
+        apt install -y build-essential cmake clang pkg-config libxmu-dev libgl-dev libglu1-mesa-dev libsdl2-dev python3-jinja2 ninja-build autoconf automake autoconf-archive libltdl-dev qemu-user-static xxd libtool libasound2-dev libpulse-dev libaudio-dev libfribidi-dev libjack-dev libsndio-dev libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev libxss-dev libxtst-dev libxkbcommon-dev libdrm-dev libgbm-dev libgl1-mesa-dev libgles2-mesa-dev libegl1-mesa-dev libdbus-1-dev libibus-1.0-dev libudev-dev libthai-dev libusb-1.0-0-dev libpipewire-0.3-dev libwayland-dev libdecor-0-dev liburing-dev; \
     fi
 
 RUN mkdir -p /{compile,output/{steamcmd,box64,openstarbound}}
