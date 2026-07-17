@@ -54,7 +54,7 @@ RUN --mount=type=cache,id=apt-trixie-$TARGETPLATFORM,sharing=locked,target=/var/
     --mount=type=cache,id=apt-trixie-$TARGETPLATFORM,sharing=locked,target=/var/cache/debconf \
     apt install -y binutils && \
     if [[ "$TARGETPLATFORM" == "linux/arm64" ]]; then \
-        apt install -y build-essential cmake clang pkg-config libxmu-dev libgl-dev libglu1-mesa-dev libsdl2-dev python3-jinja2 ninja-build autoconf automake autoconf-archive libltdl-dev qemu-user-static xxd libtool libasound2-dev libpulse-dev libaudio-dev libfribidi-dev libjack-dev libsndio-dev libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev libxss-dev libxtst-dev libxkbcommon-dev libdrm-dev libgbm-dev libgl1-mesa-dev libgles2-mesa-dev libegl1-mesa-dev libdbus-1-dev libibus-1.0-dev libudev-dev libthai-dev libusb-1.0-0-dev libpipewire-0.3-dev libwayland-dev libdecor-0-dev liburing-dev; \
+        apt install -y gh build-essential cmake clang pkg-config libxmu-dev libgl-dev libglu1-mesa-dev libsdl2-dev python3-jinja2 ninja-build autoconf automake autoconf-archive libltdl-dev qemu-user-static xxd libtool libasound2-dev libpulse-dev libaudio-dev libfribidi-dev libjack-dev libsndio-dev libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev libxss-dev libxtst-dev libxkbcommon-dev libdrm-dev libgbm-dev libgl1-mesa-dev libgles2-mesa-dev libegl1-mesa-dev libdbus-1-dev libibus-1.0-dev libudev-dev libthai-dev libusb-1.0-0-dev libpipewire-0.3-dev libwayland-dev libdecor-0-dev liburing-dev; \
     fi
 
 RUN mkdir -p /{compile,output/{steamcmd,box64,openstarbound}}
@@ -82,7 +82,7 @@ RUN --mount=type=cache,id=apt-bookworm-$TARGETPLATFORM,sharing=locked,target=/va
     if [[ "$TARGETPLATFORM" == "linux/arm64" ]]; then \
         apt update && \
         apt install -y git cmake lld clang llvm ninja-build pkg-config libsdl2-dev qtbase5-dev qtdeclarative5-dev && \
-        git clone --depth 1 --recurse-submodules https://github.com/FEX-Emu/FEX.git && \
+        git clone --depth 1 --branch $(git ls-remote --tags https://github.com/FEX-Emu/FEX.git | grep -oE 'FEX\-[0-9]{4}$' | tail -1) --recurse-submodules --shallow-submodules https://github.com/FEX-Emu/FEX.git && \
         cd /compile/FEX && \
         mkdir build && \
         cmake -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release -DUSE_LINKER=lld -DENABLE_LTO=True -DBUILD_TESTING=False -DENABLE_ASSERTIONS=False -G Ninja . && \
@@ -110,7 +110,7 @@ RUN if [[ "$TARGETPLATFORM" == "linux/arm64" ]]; then \
 FROM builder AS builder-box64
 
 RUN if [[ "$TARGETPLATFORM" == "linux/arm64" ]]; then \
-        git clone --depth 1 https://github.com/ptitSeb/box64.git && \
+        git clone --depth 1 --branch $(git ls-remote --tags https://github.com/ptitSeb/box64.git | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+$' | tail -1) https://github.com/ptitSeb/box64.git && \
         cd /compile/box64 && \
         cmake . -D ADLINK=1 -D ARM_DYNAREC=ON -D BOX32=ON -D BOX32_BINFMT=ON -D CMAKE_BUILD_TYPE=Release && \
         make -j$(nproc) && \
