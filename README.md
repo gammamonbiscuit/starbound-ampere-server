@@ -28,14 +28,45 @@ This is my attempt on running Starbound dedicated server in an Oracle Ampere A1 
      - Backups your universe into a `*.zip` file before starting the server, useful if you accidentally dropped a nuke in your base.
      - Able to keep multiple versions, what if this is combined with some external script handling auto server restart...
 
-## Build
+## How to run a server
+1. Clone this repo
+```bash
+git clone https://github.com/gammamonbiscuit/starbound-ampere-server.git
+```
+2. Go into the repo's directory
+```bash
+cd starbound-ampere-server
+```
+
+3. Build docker image
 ```bash
 docker build -t starbound-ampere-server:local .
 ```
->[!NOTE]
->This will take a long time to compile, about half an hour on my 4-core VM.Standard.A1.Flex instance, or 15-20 minutes on Apple M4 depending on how fast I can download FEX-Emu and vcpkg. When building for `linux/amd64` it just downloads OpenStarbound's [release assets](https://github.com/OpenStarbound/OpenStarbound/releases)~~, if an `linux/arm64` build becomes available from them in the future, I will use that too instead of compiling everything~~. OpenStarbound `linux/arm64` build is now available after [commit 9f76581](https://github.com/OpenStarbound/OpenStarbound/commit/9f76581af209e1838e483d1130fd7aaf6cc13dac), the build script now tries to download the arm64 artifacts, if that fails, it falls back to build from source.
 
-## Docker Compose
+>[!NOTE]
+>If you are running this in an ARM64 machine, this will take a long time to compile, about half an hour on my 4-core VM.Standard.A1.Flex instance, or 15-20 minutes on Apple M4 depending on how fast I can download FEX-Emu and vcpkg. When building for `linux/amd64` it just downloads OpenStarbound's [release assets](https://github.com/OpenStarbound/OpenStarbound/releases) which should only take a minute or two. OpenStarbound `linux/arm64` build is now available after [commit 9f76581](https://github.com/OpenStarbound/OpenStarbound/commit/9f76581af209e1838e483d1130fd7aaf6cc13dac), the build script now tries to download the arm64 artifacts, if that fails, it falls back to build from source.
+
+4. Create server's data directories
+```bash
+mkdir -p starbound-mods starbound-storage starbound-backup starbound-data
+```
+
+5. Optional: Copy the example config
+```bash
+cp starbound.env.example ./starbound-data/starbound.env
+```
+
+6. Optional: Edit config with nano (or your preferred editor)
+```bash
+nano ./starbound-data/starbound.env
+```
+
+7. Start the server
+```bash
+docker compose up
+```
+
+## Docker Compose and directory structure
 ```yml
 services:
   starbound:
@@ -45,14 +76,14 @@ services:
     user: 1000:1000
     ports: [21025:21025/tcp]
     volumes:
-      - ~/.starbound-mods:/server/starbound/mods
-      - ~/.starbound-storage:/server/starbound/storage
-      - ~/.starbound-backup:/server/backup
-      - ~/.starbound-data:/server/data
+      - ./starbound-mods:/server/starbound/mods
+      - ./starbound-storage:/server/starbound/storage
+      - ./starbound-backup:/server/backup
+      - ./starbound-data:/server/data
     restart: unless-stopped
 ```
 
-This [docker-compose.yml](/docker-compose.yml) example only mounts some user serviceable paths, but if you have more needs, here's the directory tree:
+This [compose.yml](/compose.yml) example only mounts some user serviceable paths, but if you have more needs, here's the directory tree inside the container:
 
 ```
 /server                 # The container's working directory
@@ -89,7 +120,7 @@ The one from client also works.
 
 
 ## Environment Variables
-These variables should be modified in `starbound.env` instead of `docker-compose.yml` because the main script will read them from `starbound.env` at runtime, if you still prefer that you can place an empty `starbound.env` to bypass re-creation.
+These variables should be modified in `starbound.env` instead of `compose.yml` because the main script will read them from `starbound.env` at runtime, if you still prefer that you can place an empty `starbound.env` to bypass re-creation.
 
 | Variable | Default | Example | Info |
 |:----|:----|:----|:----|
