@@ -214,13 +214,13 @@ RUN mkdir -m 755 -p /server/{backup,data,steamcmd/home/.fex-emu,starbound/{asset
 
 USER steam
 WORKDIR /server
-COPY --chown=root:root   --chmod=755 --from=builder-fex           /output/fex           /usr/bin
-COPY --chown=root:root   --chmod=755 --from=builder-fex-rootfs    /output/rootfs        /server/rootfs
-COPY --chown=root:root   --chmod=755 --from=builder-box64         /output/box64         /
-COPY --chown=steam:steam --chmod=755 --from=builder-osb           /output/openstarbound /server/openstarbound
-COPY --chown=steam:steam --chmod=755 --from=builder-steam         /output/steamcmd      /server/steamcmd
-COPY --chown=steam:steam --chmod=755                              starbound.sh          /server/
-COPY --chown=steam:steam --chmod=755                              starbound.env         /server/data/
+COPY --chown=root:root   --chmod=755 --from=builder-fex           /output/fex                   /usr/bin
+COPY --chown=root:root   --chmod=755 --from=builder-fex-rootfs    /output/rootfs                /server/rootfs
+COPY --chown=root:root   --chmod=755 --from=builder-box64         /output/box64                 /
+COPY --chown=steam:steam --chmod=755 --from=builder-osb           /output/openstarbound         /server/openstarbound
+COPY --chown=steam:steam --chmod=755 --from=builder-steam         /output/steamcmd              /server/steamcmd
+COPY --chown=steam:steam --chmod=755                              starbound.sh                  /server/
+COPY --chown=steam:steam --chmod=755                              starbound.env.example         /server/data/starbound.env
 RUN echo '{"Config":{"RootFS":"/server/rootfs"}}' >/server/steamcmd/home/.fex-emu/Config.json
 EXPOSE 21025/tcp
 STOPSIGNAL SIGINT
