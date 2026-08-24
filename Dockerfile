@@ -24,7 +24,6 @@ ENV OPENSTARBOUND_VERSION= \
     WORKSHOP_CHUNK=20 \
     WORKSHOP_PRUNE=true \
     WORKSHOP_MAX_RETRY=3 \
-    FEX_ENABLED=false \
     BOX64_LOG=0 \
     BOX64_NOBANNER=1 \
     BOX64_DYNAREC_STRONGMEM=1 \
@@ -67,45 +66,6 @@ RUN cd /output/steamcmd && \
     curl -L -O "https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz" && \
     tar zxvf "steamcmd_linux.tar.gz" && \
     rm "steamcmd_linux.tar.gz"
-
-FROM init AS builder-fex
-
-COPY --from=debian:bookworm-slim / /
-
-RUN mkdir -p /{compile,output/fex}
-
-WORKDIR /compile
-
-RUN --mount=type=cache,id=apt-bookworm-$TARGETPLATFORM,sharing=locked,target=/var/cache/apt \
-    --mount=type=cache,id=apt-bookworm-$TARGETPLATFORM,sharing=locked,target=/var/lib/apt \
-    --mount=type=cache,id=apt-bookworm-$TARGETPLATFORM,sharing=locked,target=/var/cache/debconf \
-    if [[ "$TARGETPLATFORM" == "linux/arm64" ]]; then \
-        apt update && \
-        apt install -y git cmake lld clang llvm ninja-build pkg-config libsdl2-dev qtbase5-dev qtdeclarative5-dev && \
-        git clone --depth 1 --branch $(git ls-remote --tags https://github.com/FEX-Emu/FEX.git | grep -oE 'FEX\-[0-9]{4}$' | tail -1) --recurse-submodules --shallow-submodules https://github.com/FEX-Emu/FEX.git && \
-        cd /compile/FEX && \
-        mkdir build && \
-        cmake -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release -DUSE_LINKER=lld -DENABLE_LTO=True -DBUILD_TESTING=False -DENABLE_ASSERTIONS=False -G Ninja . && \
-        ninja -j$(nproc) && \
-        mv /compile/FEX/Bin/* /output/fex; \
-    fi
-
-FROM --platform=linux/amd64 debian:trixie-slim AS rootfs
-FROM builder AS builder-fex-rootfs
-
-COPY --from=rootfs / /output/rootfs
-
-RUN if [[ "$TARGETPLATFORM" == "linux/arm64" ]]; then \
-        cd /output/rootfs && \
-        chroot . apt update && \
-        chroot . apt install -y lib32gcc-s1 && \
-        rm -rf boot dev home media mnt proc root srv tmp sys opt var/cache/apt var/lib/apt var/lib/dpkg && \
-        cd etc && \
-        rm -f hosts resolv.conf timezone localtime passwd; \
-    else \
-        rm -rf /output/rootfs && \
-        mkdir /output/rootfs; \
-    fi
 
 FROM builder AS builder-box64
 
@@ -207,21 +167,18 @@ RUN cd /output/openstarbound/linux && \
 
 FROM base AS final
 
-RUN mkdir -m 755 -p /server/{backup,data,steamcmd/home/.fex-emu,starbound/{assets,mods,storage,logs,steamapps}} && \
+RUN mkdir -m 755 -p /server/{backup,data,steamcmd/home,starbound/{assets,mods,storage,logs,steamapps}} && \
     groupadd -g 1000 steam && \
     useradd -u 1000 -g steam -d /server/steamcmd/home steam && \
     chown -R steam:steam /server
 
 USER steam
 WORKDIR /server
-COPY --chown=root:root   --chmod=755 --from=builder-fex           /output/fex                   /usr/bin
-COPY --chown=root:root   --chmod=755 --from=builder-fex-rootfs    /output/rootfs                /server/rootfs
 COPY --chown=root:root   --chmod=755 --from=builder-box64         /output/box64                 /
 COPY --chown=steam:steam --chmod=755 --from=builder-osb           /output/openstarbound         /server/openstarbound
 COPY --chown=steam:steam --chmod=755 --from=builder-steam         /output/steamcmd              /server/steamcmd
 COPY --chown=steam:steam --chmod=755                              starbound.sh                  /server/
 COPY --chown=steam:steam --chmod=755                              starbound.env.example         /server/data/starbound.env
-RUN echo '{"Config":{"RootFS":"/server/rootfs"}}' >/server/steamcmd/home/.fex-emu/Config.json
 EXPOSE 21025/tcp
 STOPSIGNAL SIGINT
 ENTRYPOINT ["/bin/bash", "-c"]

@@ -2,6 +2,9 @@
 This is my attempt on running Starbound dedicated server in an Oracle Ampere A1 Compute instance.
 
 >[!WARNING]
+>This branch have ongoing major changes, contents in this README are outdated.
+
+>[!WARNING]
 >Downloading from nightly.link is [currently not available](https://github.com/OpenStarbound/OpenStarbound/issues/538), file structure also slightly changed. At this moment, the script would download v0.1.14 release for x86, and fall back to build from source for arm64.
 
 >[!WARNING]

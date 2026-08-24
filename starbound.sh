@@ -25,7 +25,7 @@ for LOOP_PERMISSION_CHECK in "${PERMISSION_CHECK[@]}"; do
     fi
 done
 
-mkdir -m 755 -p /server/{backup,data,steamcmd/home/.fex-emu,starbound/{assets,mods,storage,logs,steamapps}}
+mkdir -m 755 -p /server/{backup,data,steamcmd/home,starbound/{assets,mods,storage,logs,steamapps}}
 echo "🚧 Logging started" | tee $CONTAINER_LOGFILE
 
 if [[ ! -f "/server/data/starbound.env" ]]; then
@@ -43,10 +43,6 @@ OPENSTARBOUND=$OPENSTARBOUND
 # Starbound will be launched after all update operations (if any) are finished.
 # Default: true
 LAUNCH_GAME=$LAUNCH_GAME
-
-# Use FEX instead of box64 for x86_64 emulation.
-# Default: false
-FEX_ENABLED=$FEX_ENABLED
 
 # Backup save data on start, before any update and game launch.
 # Default: true
@@ -119,11 +115,7 @@ if [[ "$TARGETPLATFORM" == "linux/amd64" ]]; then
     RUNNER='./'
     echolog "🚧 x86"
 else
-    if [[ "$FEX_ENABLED" == true ]]; then
-        RUNNER='FEX '
-    else
-        RUNNER='box64 '
-    fi
+    RUNNER='box64 '
     echolog "🚧 arm64, ${RUNNER}"
 fi
 
