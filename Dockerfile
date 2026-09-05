@@ -53,7 +53,7 @@ RUN --mount=type=cache,id=$TARGETPLATFORM/var/cache/apt,sharing=locked,target=/v
         echo "Acquire::https::Proxy \"DIRECT\";" >> /etc/apt/apt.conf.d/01proxy; \
     fi && \
     apt update && \
-    apt install -y --no-install-recommends curl ca-certificates zip unzip tar git jq $([[ "$TARGETPLATFORM" == "linux/amd64" ]] && echo "lib32stdc++6")
+    apt install -y --no-install-recommends curl ca-certificates zip unzip tar tarlz git jq $([[ "$TARGETPLATFORM" == "linux/amd64" ]] && echo "lib32stdc++6")
 
 FROM base AS builder
 
@@ -90,25 +90,24 @@ RUN if [[ "$TARGETPLATFORM" == "linux/arm64" ]]; then \
 FROM builder AS builder-osb
 
 RUN if [[ "$TARGETPLATFORM" == "linux/arm64" ]]; then \
-        if [[ -z "$OPENSTARBOUND_VERSION" ]]; then \
-            ASSETS=https://nightly.link/OpenStarbound/OpenStarbound/workflows/build/main; \
-        else \
-            ASSETS=https://github.com/OpenStarbound/OpenStarbound/releases/download/${OPENSTARBOUND_VERSION}; \
-        fi && \
-        curl -L -O "${ASSETS}/OpenStarbound-Linux-ARM-Clang-{Server,Client}.zip" && \
-        if [[ "$(xxd -E -p -l 4 OpenStarbound-Linux-ARM-Clang-Server.zip)" == "504b0304" && "$(xxd -E -p -l 4 -s -22 OpenStarbound-Linux-ARM-Clang-Server.zip)" == "504b0506" && "$(xxd -E -p -l 4 OpenStarbound-Linux-ARM-Clang-Client.zip)" == "504b0304" && "$(xxd -E -p -l 4 -s -22 OpenStarbound-Linux-ARM-Clang-Client.zip)" == "504b0506" ]]; then \
-            unzip "OpenStarbound-Linux-ARM-Clang-*.zip" && \
-            if [[ -f "server.tar" && -f "client.tar" ]]; then \
-                tar xvf "server.tar" && \
-                tar xvf "client.tar" && \
-                mv server_distribution/* /output/openstarbound/ && \
-                mv client_distribution/linux/asset_packer client_distribution/linux/asset_unpacker /output/openstarbound/linux/ && \
-                rm /output/openstarbound/mods/mods_go_here; \
-            else \
-                exit 1; \
-            fi; \
-        fi; \
-    fi
+        ARM="-ARM"; \
+    fi && \
+    ASSET=$(echo "https://github.com/OpenStarbound/OpenStarbound/releases/download/${OPENSTARBOUND_VERSION:-latest}/OpenStarbound-Linux${ARM}-Clang-{Server,Client}" | sed -r "s/(download)\/(latest)/\2\/\1/") && \
+    if [[ $(curl -sIw "%{http_code}" -o /dev/null -o /dev/null "${ASSET}.tar.lz") == "302302" ]]; then \
+        curl -LOO "${ASSET}.tar.lz" && \
+        tarlz -xvf "OpenStarbound-Linux${ARM}-Clang-Server.tar.lz" && \
+        tarlz -xvf "OpenStarbound-Linux${ARM}-Clang-Client.tar.lz"; \
+    elif [[ $(curl -sIw "%{http_code}" -o /dev/null -o /dev/null "${ASSET}.zip") == "302302" ]]; then \
+        curl -LOO "${ASSET}.zip" && \
+        unzip "OpenStarbound-Linux${ARM}-Clang-*.zip" && \
+        tar xvf "server.tar" && \
+        tar xvf "client.tar"; \
+    elif [[ true ]]; then \
+        exit 0; \
+    fi && \
+    mv server_distribution/* /output/openstarbound/ && \
+    mv client_distribution/linux/asset_packer client_distribution/linux/asset_unpacker /output/openstarbound/linux/ && \
+    rm /output/openstarbound/mods/mods_go_here
 
 RUN if [[ "$TARGETPLATFORM" == "linux/arm64" && ! $(compgen -G "/output/openstarbound/linux/starbound_server") ]]; then \
         git clone --depth 1 https://github.com/microsoft/vcpkg.git && \
@@ -148,25 +147,6 @@ RUN if [[ "$TARGETPLATFORM" == "linux/arm64" && ! $(compgen -G "/output/openstar
           scripts/ci/linux/sbinit.config \
           scripts/steam_appid.txt \
           /output/openstarbound/linux/; \
-    fi
-
-RUN if [[ "$TARGETPLATFORM" == "linux/amd64" ]]; then \
-        if [[ -z "$OPENSTARBOUND_VERSION" ]]; then \
-            ASSETS=https://github.com/OpenStarbound/OpenStarbound/releases/download/v0.1.14; \
-        else \
-            ASSETS=https://github.com/OpenStarbound/OpenStarbound/releases/download/${OPENSTARBOUND_VERSION}; \
-        fi && \
-        curl -L -O "${ASSETS}/OpenStarbound-Linux-Clang-{Server,Client}.zip" && \
-        unzip "OpenStarbound-Linux-Clang-*.zip" && \
-        if [[ -f "server.tar" && -f "client.tar" ]]; then \
-            tar xvf "server.tar" && \
-            tar xvf "client.tar" && \
-            mv server_distribution/* /output/openstarbound/ && \
-            mv client_distribution/linux/asset_packer client_distribution/linux/asset_unpacker /output/openstarbound/linux/ && \
-            rm /output/openstarbound/mods/mods_go_here; \
-        else \
-            exit 1; \
-        fi \
     fi
 
 RUN cd /output/openstarbound/linux && \
