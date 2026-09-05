@@ -48,7 +48,7 @@ RUN --mount=type=cache,id=$TARGETPLATFORM/var/cache/apt,sharing=locked,target=/v
     --mount=type=cache,id=$TARGETPLATFORM/var/lib/apt,sharing=locked,target=/var/lib/apt \
     --mount=type=cache,id=$TARGETPLATFORM/var/cache/debconf,sharing=locked,target=/var/cache/debconf \
     --mount=type=cache,id=$TARGETPLATFORM/etc/apt/apt.conf.d,sharing=locked,from=os,source=/etc/apt/apt.conf.d,target=/etc/apt/apt.conf.d \
-    if [[ $APT_CACHE == true ]]; then \
+    if [[ ${APT_CACHE,,} == true ]]; then \
         echo "Acquire::http::Proxy \"http://${APT_CACHE_PROXY}\";" >> /etc/apt/apt.conf.d/01proxy && \
         echo "Acquire::https::Proxy \"DIRECT\";" >> /etc/apt/apt.conf.d/01proxy; \
     fi && \
