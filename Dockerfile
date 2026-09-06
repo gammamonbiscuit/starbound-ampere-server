@@ -1,7 +1,9 @@
-FROM scratch AS init
+FROM scratch AS env
 
 ARG TARGETPLATFORM \
     DEBIAN_FRONTEND=noninteractive \
+    APT_CACHE=false \
+    APT_CACHE_PROXY=host.docker.internal:3142 \
     VCPKG_ROOT=/compile/vcpkg \
     CC=clang \
     CXX=clang++
@@ -24,7 +26,6 @@ ENV OPENSTARBOUND_VERSION= \
     WORKSHOP_CHUNK=20 \
     WORKSHOP_PRUNE=true \
     WORKSHOP_MAX_RETRY=3 \
-    FEX_ENABLED=false \
     BOX64_LOG=0 \
     BOX64_NOBANNER=1 \
     BOX64_DYNAREC_STRONGMEM=1 \
@@ -37,24 +38,32 @@ ENV OPENSTARBOUND_VERSION= \
 
 SHELL ["/bin/bash", "-c"]
 
-FROM init AS base
+FROM debian:trixie-slim as os
 
-COPY --from=debian:trixie-slim / /
+FROM env AS base
 
-RUN --mount=type=cache,id=apt-trixie-$TARGETPLATFORM,sharing=locked,target=/var/cache/apt \
-    --mount=type=cache,id=apt-trixie-$TARGETPLATFORM,sharing=locked,target=/var/lib/apt \
-    --mount=type=cache,id=apt-trixie-$TARGETPLATFORM,sharing=locked,target=/var/cache/debconf \
+COPY --from=os / /
+
+RUN --mount=type=cache,id=$TARGETPLATFORM/var/cache/apt,sharing=locked,target=/var/cache/apt \
+    --mount=type=cache,id=$TARGETPLATFORM/var/lib/apt,sharing=locked,target=/var/lib/apt \
+    --mount=type=cache,id=$TARGETPLATFORM/var/cache/debconf,sharing=locked,target=/var/cache/debconf \
+    --mount=type=cache,id=$TARGETPLATFORM/etc/apt/apt.conf.d,sharing=locked,from=os,source=/etc/apt/apt.conf.d,target=/etc/apt/apt.conf.d \
+    if [[ ${APT_CACHE,,} == true ]]; then \
+        echo "Acquire::http::Proxy \"http://${APT_CACHE_PROXY}\";" >> /etc/apt/apt.conf.d/01proxy && \
+        echo "Acquire::https::Proxy \"DIRECT\";" >> /etc/apt/apt.conf.d/01proxy; \
+    fi && \
     apt update && \
-    apt install -y --no-install-recommends curl ca-certificates zip unzip tar git jq $([[ "$TARGETPLATFORM" == "linux/amd64" ]] && echo "lib32stdc++6")
+    apt install -y --no-install-recommends curl ca-certificates zip unzip tar tarlz git jq $([[ "$TARGETPLATFORM" == "linux/amd64" ]] && echo "lib32stdc++6")
 
 FROM base AS builder
 
-RUN --mount=type=cache,id=apt-trixie-$TARGETPLATFORM,sharing=locked,target=/var/cache/apt \
-    --mount=type=cache,id=apt-trixie-$TARGETPLATFORM,sharing=locked,target=/var/lib/apt \
-    --mount=type=cache,id=apt-trixie-$TARGETPLATFORM,sharing=locked,target=/var/cache/debconf \
+RUN --mount=type=cache,id=$TARGETPLATFORM/var/cache/apt,sharing=locked,target=/var/cache/apt \
+    --mount=type=cache,id=$TARGETPLATFORM/var/lib/apt,sharing=locked,target=/var/lib/apt \
+    --mount=type=cache,id=$TARGETPLATFORM/var/cache/debconf,sharing=locked,target=/var/cache/debconf \
+    --mount=type=cache,id=$TARGETPLATFORM/etc/apt/apt.conf.d,sharing=locked,from=os,source=/etc/apt/apt.conf.d,target=/etc/apt/apt.conf.d \
     apt install -y binutils && \
     if [[ "$TARGETPLATFORM" == "linux/arm64" ]]; then \
-        apt install -y build-essential cmake clang pkg-config libxmu-dev libgl-dev libglu1-mesa-dev libsdl2-dev python3-jinja2 ninja-build autoconf automake autoconf-archive libltdl-dev qemu-user-static xxd libtool libasound2-dev libpulse-dev libaudio-dev libfribidi-dev libjack-dev libsndio-dev libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev libxss-dev libxtst-dev libxkbcommon-dev libdrm-dev libgbm-dev libgl1-mesa-dev libgles2-mesa-dev libegl1-mesa-dev libdbus-1-dev libibus-1.0-dev libudev-dev libthai-dev libusb-1.0-0-dev libpipewire-0.3-dev libwayland-dev libdecor-0-dev liburing-dev; \
+        apt install -y build-essential cmake clang pkg-config libxmu-dev libgl-dev libglu1-mesa-dev libsdl2-dev python3-jinja2 ninja-build autoconf automake autoconf-archive libltdl-dev libtool libasound2-dev libpulse-dev libaudio-dev libfribidi-dev libjack-dev libsndio-dev libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev libxss-dev libxtst-dev libxkbcommon-dev libdrm-dev libgbm-dev libgl1-mesa-dev libgles2-mesa-dev libegl1-mesa-dev libdbus-1-dev libibus-1.0-dev libudev-dev libthai-dev libusb-1.0-0-dev libpipewire-0.3-dev libwayland-dev libdecor-0-dev liburing-dev; \
     fi
 
 RUN mkdir -p /{compile,output/{steamcmd,box64,openstarbound}}
@@ -67,45 +76,6 @@ RUN cd /output/steamcmd && \
     curl -L -O "https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz" && \
     tar zxvf "steamcmd_linux.tar.gz" && \
     rm "steamcmd_linux.tar.gz"
-
-FROM init AS builder-fex
-
-COPY --from=debian:bookworm-slim / /
-
-RUN mkdir -p /{compile,output/fex}
-
-WORKDIR /compile
-
-RUN --mount=type=cache,id=apt-bookworm-$TARGETPLATFORM,sharing=locked,target=/var/cache/apt \
-    --mount=type=cache,id=apt-bookworm-$TARGETPLATFORM,sharing=locked,target=/var/lib/apt \
-    --mount=type=cache,id=apt-bookworm-$TARGETPLATFORM,sharing=locked,target=/var/cache/debconf \
-    if [[ "$TARGETPLATFORM" == "linux/arm64" ]]; then \
-        apt update && \
-        apt install -y git cmake lld clang llvm ninja-build pkg-config libsdl2-dev qtbase5-dev qtdeclarative5-dev && \
-        git clone --depth 1 --branch $(git ls-remote --tags https://github.com/FEX-Emu/FEX.git | grep -oE 'FEX\-[0-9]{4}$' | tail -1) --recurse-submodules --shallow-submodules https://github.com/FEX-Emu/FEX.git && \
-        cd /compile/FEX && \
-        mkdir build && \
-        cmake -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release -DUSE_LINKER=lld -DENABLE_LTO=True -DBUILD_TESTING=False -DENABLE_ASSERTIONS=False -G Ninja . && \
-        ninja -j$(nproc) && \
-        mv /compile/FEX/Bin/* /output/fex; \
-    fi
-
-FROM --platform=linux/amd64 debian:trixie-slim AS rootfs
-FROM builder AS builder-fex-rootfs
-
-COPY --from=rootfs / /output/rootfs
-
-RUN if [[ "$TARGETPLATFORM" == "linux/arm64" ]]; then \
-        cd /output/rootfs && \
-        chroot . apt update && \
-        chroot . apt install -y lib32gcc-s1 && \
-        rm -rf boot dev home media mnt proc root srv tmp sys opt var/cache/apt var/lib/apt var/lib/dpkg && \
-        cd etc && \
-        rm -f hosts resolv.conf timezone localtime passwd; \
-    else \
-        rm -rf /output/rootfs && \
-        mkdir /output/rootfs; \
-    fi
 
 FROM builder AS builder-box64
 
@@ -120,25 +90,24 @@ RUN if [[ "$TARGETPLATFORM" == "linux/arm64" ]]; then \
 FROM builder AS builder-osb
 
 RUN if [[ "$TARGETPLATFORM" == "linux/arm64" ]]; then \
-        if [[ -z "$OPENSTARBOUND_VERSION" ]]; then \
-            ASSETS=https://nightly.link/OpenStarbound/OpenStarbound/workflows/build/main; \
-        else \
-            ASSETS=https://github.com/OpenStarbound/OpenStarbound/releases/download/${OPENSTARBOUND_VERSION}; \
-        fi && \
-        curl -L -O "${ASSETS}/OpenStarbound-Linux-ARM-Clang-{Server,Client}.zip" && \
-        if [[ "$(xxd -E -p -l 4 OpenStarbound-Linux-ARM-Clang-Server.zip)" == "504b0304" && "$(xxd -E -p -l 4 -s -22 OpenStarbound-Linux-ARM-Clang-Server.zip)" == "504b0506" && "$(xxd -E -p -l 4 OpenStarbound-Linux-ARM-Clang-Client.zip)" == "504b0304" && "$(xxd -E -p -l 4 -s -22 OpenStarbound-Linux-ARM-Clang-Client.zip)" == "504b0506" ]]; then \
-            unzip "OpenStarbound-Linux-ARM-Clang-*.zip" && \
-            if [[ -f "server.tar" && -f "client.tar" ]]; then \
-                tar xvf "server.tar" && \
-                tar xvf "client.tar" && \
-                mv server_distribution/* /output/openstarbound/ && \
-                mv client_distribution/linux/asset_packer client_distribution/linux/asset_unpacker /output/openstarbound/linux/ && \
-                rm /output/openstarbound/mods/mods_go_here; \
-            else \
-                exit 1; \
-            fi; \
-        fi; \
-    fi
+        ARM="-ARM"; \
+    fi && \
+    ASSET=$(echo "https://github.com/OpenStarbound/OpenStarbound/releases/download/${OPENSTARBOUND_VERSION:-latest}/OpenStarbound-Linux${ARM}-Clang-{Server,Client}" | sed -r "s/(download)\/(latest)/\2\/\1/") && \
+    if [[ $(curl -sIw "%{http_code}" -o /dev/null -o /dev/null "${ASSET}.tar.lz") == "302302" ]]; then \
+        curl -LOO "${ASSET}.tar.lz" && \
+        tarlz -xvf "OpenStarbound-Linux${ARM}-Clang-Server.tar.lz" && \
+        tarlz -xvf "OpenStarbound-Linux${ARM}-Clang-Client.tar.lz"; \
+    elif [[ $(curl -sIw "%{http_code}" -o /dev/null -o /dev/null "${ASSET}.zip") == "302302" ]]; then \
+        curl -LOO "${ASSET}.zip" && \
+        unzip "OpenStarbound-Linux${ARM}-Clang-*.zip" && \
+        tar xvf "server.tar" && \
+        tar xvf "client.tar"; \
+    elif [[ true ]]; then \
+        exit 0; \
+    fi && \
+    mv server_distribution/* /output/openstarbound/ && \
+    mv client_distribution/linux/asset_packer client_distribution/linux/asset_unpacker /output/openstarbound/linux/ && \
+    rm /output/openstarbound/mods/mods_go_here
 
 RUN if [[ "$TARGETPLATFORM" == "linux/arm64" && ! $(compgen -G "/output/openstarbound/linux/starbound_server") ]]; then \
         git clone --depth 1 https://github.com/microsoft/vcpkg.git && \
@@ -180,25 +149,6 @@ RUN if [[ "$TARGETPLATFORM" == "linux/arm64" && ! $(compgen -G "/output/openstar
           /output/openstarbound/linux/; \
     fi
 
-RUN if [[ "$TARGETPLATFORM" == "linux/amd64" ]]; then \
-        if [[ -z "$OPENSTARBOUND_VERSION" ]]; then \
-            ASSETS=https://github.com/OpenStarbound/OpenStarbound/releases/download/v0.1.14; \
-        else \
-            ASSETS=https://github.com/OpenStarbound/OpenStarbound/releases/download/${OPENSTARBOUND_VERSION}; \
-        fi && \
-        curl -L -O "${ASSETS}/OpenStarbound-Linux-Clang-{Server,Client}.zip" && \
-        unzip "OpenStarbound-Linux-Clang-*.zip" && \
-        if [[ -f "server.tar" && -f "client.tar" ]]; then \
-            tar xvf "server.tar" && \
-            tar xvf "client.tar" && \
-            mv server_distribution/* /output/openstarbound/ && \
-            mv client_distribution/linux/asset_packer client_distribution/linux/asset_unpacker /output/openstarbound/linux/ && \
-            rm /output/openstarbound/mods/mods_go_here; \
-        else \
-            exit 1; \
-        fi \
-    fi
-
 RUN cd /output/openstarbound/linux && \
     strip -S starbound_server && \
     strip -S btree_repacker && \
@@ -207,21 +157,18 @@ RUN cd /output/openstarbound/linux && \
 
 FROM base AS final
 
-RUN mkdir -m 755 -p /server/{backup,data,steamcmd/home/.fex-emu,starbound/{assets,mods,storage,logs,steamapps}} && \
+RUN mkdir -m 755 -p /server/{backup,data,steamcmd/home,starbound/{assets,mods,storage,logs,steamapps}} && \
     groupadd -g 1000 steam && \
     useradd -u 1000 -g steam -d /server/steamcmd/home steam && \
     chown -R steam:steam /server
 
 USER steam
 WORKDIR /server
-COPY --chown=root:root   --chmod=755 --from=builder-fex           /output/fex           /usr/bin
-COPY --chown=root:root   --chmod=755 --from=builder-fex-rootfs    /output/rootfs        /server/rootfs
-COPY --chown=root:root   --chmod=755 --from=builder-box64         /output/box64         /
-COPY --chown=steam:steam --chmod=755 --from=builder-osb           /output/openstarbound /server/openstarbound
-COPY --chown=steam:steam --chmod=755 --from=builder-steam         /output/steamcmd      /server/steamcmd
-COPY --chown=steam:steam --chmod=755                              starbound.sh          /server/
-COPY --chown=steam:steam --chmod=755                              starbound.env         /server/data/
-RUN echo '{"Config":{"RootFS":"/server/rootfs"}}' >/server/steamcmd/home/.fex-emu/Config.json
+COPY --chown=root:root   --chmod=755 --from=builder-box64         /output/box64                 /
+COPY --chown=steam:steam --chmod=755 --from=builder-osb           /output/openstarbound         /server/openstarbound
+COPY --chown=steam:steam --chmod=755 --from=builder-steam         /output/steamcmd              /server/steamcmd
+COPY --chown=steam:steam --chmod=755                              starbound.sh                  /server/
+COPY --chown=steam:steam --chmod=755                              starbound.env.example         /server/data/starbound.env
 EXPOSE 21025/tcp
 STOPSIGNAL SIGINT
 ENTRYPOINT ["/bin/bash", "-c"]

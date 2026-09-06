@@ -25,7 +25,7 @@ for LOOP_PERMISSION_CHECK in "${PERMISSION_CHECK[@]}"; do
     fi
 done
 
-mkdir -m 755 -p /server/{backup,data,steamcmd/home/.fex-emu,starbound/{assets,mods,storage,logs,steamapps}}
+mkdir -m 755 -p /server/{backup,data,steamcmd/home,starbound/{assets,mods,storage,logs,steamapps}}
 echo "🚧 Logging started" | tee $CONTAINER_LOGFILE
 
 if [[ ! -f "/server/data/starbound.env" ]]; then
@@ -43,10 +43,6 @@ OPENSTARBOUND=$OPENSTARBOUND
 # Starbound will be launched after all update operations (if any) are finished.
 # Default: true
 LAUNCH_GAME=$LAUNCH_GAME
-
-# Use FEX instead of box64 for x86_64 emulation.
-# Default: false
-FEX_ENABLED=$FEX_ENABLED
 
 # Backup save data on start, before any update and game launch.
 # Default: true
@@ -119,15 +115,11 @@ if [[ "$TARGETPLATFORM" == "linux/amd64" ]]; then
     RUNNER='./'
     echolog "🚧 x86"
 else
-    if [[ "$FEX_ENABLED" == true ]]; then
-        RUNNER='FEX '
-    else
-        RUNNER='box64 '
-    fi
+    RUNNER='box64 '
     echolog "🚧 arm64, ${RUNNER}"
 fi
 
-if [[ $OPENSTARBOUND == true ]]; then
+if [[ ${OPENSTARBOUND,,} == true ]]; then
     echolog "🎮 OpenStarbound selected."
     echolog "🎮 https://github.com/OpenStarbound/OpenStarbound"
 else
@@ -136,7 +128,7 @@ else
 fi
 
 # Backup save data on start.
-if [[ $BACKUP_ENABLED == true ]]; then
+if [[ ${BACKUP_ENABLED,,} == true ]]; then
     echolog "💾 Backup enabled."
     BACKUP_LATEST=$(find /server/backup -type f | grep -E "\/universe_[0-9]{10}.zip$" | sort -r | head -1 | sed -r "s/.*\/universe_([0-9]{10}).zip$/\1/g")
     BACKUP_COOLNESS=$(($(date +%s) - ${BACKUP_LATEST:-0}))
@@ -147,11 +139,11 @@ if [[ $BACKUP_ENABLED == true ]]; then
         pushd /server/starbound > /dev/null
         echolog "  📁 Save file"
         zip $BACKUP_NEWFILE -9or "./storage" -x "*/starbound_server.log.*" | tee -a $CONTAINER_LOGFILE
-        if [[ $BACKUP_MODS_MANUAL == true ]]; then
+        if [[ ${BACKUP_MODS_MANUAL,,} == true ]]; then
             echolog "  📁 Manual mods"
             zip $BACKUP_NEWFILE -9uor "./mods" -i "*.pak" -x "*/workshop-*.pak" | tee -a $CONTAINER_LOGFILE
         fi
-        if [[ $BACKUP_MODS_WORKSHOP == true ]]; then
+        if [[ ${BACKUP_MODS_WORKSHOP,,} == true ]]; then
             echolog "  📁 Workshop mods"
             zip $BACKUP_NEWFILE -9uor "./mods" -i "*/workshop-*.pak" | tee -a $CONTAINER_LOGFILE
         fi
@@ -165,7 +157,7 @@ fi
 
 # Update SteamCMD on launch if needed.
 STEAM_SCRIPT_BASE="+@NoPromptForPassword 1 +@sSteamCmdForcePlatformType linux +@sSteamCmdForcePlatformBitness 64 +force_install_dir /server/starbound/"
-if [[ $UPDATE_STEAM == true || $UPDATE_GAME == true || $UPDATE_WORKSHOP == true ]]; then
+if [[ ${UPDATE_STEAM,,} == true || ${UPDATE_GAME,,} == true || ${UPDATE_WORKSHOP,,} == true ]]; then
     pushd /server/steamcmd > /dev/null
     if [[ ! -f "linux32/steamcmd" ]]; then
         echolog "🚧 SteamCMD not found, reinstalling..."
@@ -185,26 +177,26 @@ else
 fi
 
 # Update game data on launch if needed.
-if [[ $UPDATE_GAME == true ]]; then
+if [[ ${UPDATE_GAME,,} == true ]]; then
     echolog "🎮 Game update enabled."
     UPDATE_GAME_BIN=true
     UPDATE_GAME_PAK_MAIN=true
     UPDATE_GAME_PAK_OPENSB=true
 else
     echolog "🎮 Game update disabled."
-    if [[ $LAUNCH_GAME == true ]]; then
+    if [[ ${LAUNCH_GAME,,} == true ]]; then
         echolog "🎮 Checking if game files exist..."
-        if [[ $OPENSTARBOUND == true ]]; then
+        if [[ ${OPENSTARBOUND,,} == true ]]; then
             if [[ -f "/server/starbound/linux/starbound_server" && $(stat -L --printf="%s" "/server/starbound/linux/starbound_server") -gt "40000000" ]]; then
                 echolog "✔️ starbound_server"
-                [[ $UPDATE_GAME = true ]] && UPDATE_GAME_BIN=true || UPDATE_GAME_BIN=false
+                [[ ${UPDATE_GAME,,} == true ]] && UPDATE_GAME_BIN=true || UPDATE_GAME_BIN=false
             else
                 echolog "❌ starbound_server"
                 UPDATE_GAME_BIN=true
             fi
             if [[ -f "/server/starbound/assets/opensb.pak" ]]; then
                 echolog "✔️ opensb.pak"
-                [[ $UPDATE_GAME == true ]] && UPDATE_GAME_PAK_OPENSB=true || UPDATE_GAME_PAK_OPENSB=false
+                [[ ${UPDATE_GAME,,} == true ]] && UPDATE_GAME_PAK_OPENSB=true || UPDATE_GAME_PAK_OPENSB=false
             else
                 echolog "❌ opensb.pak"
                 UPDATE_GAME_PAK_OPENSB=true
@@ -213,7 +205,7 @@ else
             UPDATE_GAME_PAK_OPENSB=false
             if [[ -f "/server/starbound/linux/starbound_server" && $(stat -L --printf="%s" "/server/starbound/linux/starbound_server") -lt "40000000" ]]; then
                 echolog "✔️ starbound_server"
-                [[ $UPDATE_GAME == true ]] && UPDATE_GAME_BIN=true || UPDATE_GAME_BIN=false
+                [[ ${UPDATE_GAME,,} == true ]] && UPDATE_GAME_BIN=true || UPDATE_GAME_BIN=false
             else
                 echolog "❌ starbound_server"
                 UPDATE_GAME_BIN=true
@@ -221,7 +213,7 @@ else
         fi
         if [[ -f "/server/starbound/assets/packed.pak" ]]; then
             echolog "✔️ packed.pak"
-            [[ $UPDATE_GAME == true ]] && UPDATE_GAME_PAK_MAIN=true || UPDATE_GAME_PAK_MAIN=false
+            [[ ${UPDATE_GAME,,} == true ]] && UPDATE_GAME_PAK_MAIN=true || UPDATE_GAME_PAK_MAIN=false
         else
             echolog "❌ packed.pak"
             UPDATE_GAME_PAK_MAIN=true
@@ -229,11 +221,11 @@ else
     fi
 fi
 
-if [[ $UPDATE_GAME_BIN == true || $UPDATE_GAME_PAK_MAIN == true || $UPDATE_GAME_PAK_OPENSB == true ]]; then
+if [[ ${UPDATE_GAME_BIN,,} == true || ${UPDATE_GAME_PAK_MAIN,,} == true || ${UPDATE_GAME_PAK_OPENSB,,} == true ]]; then
     echolog "🎮 (Re)installing misssing parts..."
     # Need anything from Steam? But skip this part during docker build.
-    if [[ ! $DOCKER_BUILD == true ]]; then
-        if [[ $OPENSTARBOUND == false && $UPDATE_GAME_BIN == true ]] || [[ $UPDATE_GAME_PAK_MAIN == true ]]; then
+    if [[ ! ${DOCKER_BUILD,,} == true ]]; then
+        if [[ ${OPENSTARBOUND,,} == false && ${UPDATE_GAME_BIN,,} == true ]] || [[ ${UPDATE_GAME_PAK_MAIN,,} == true ]]; then
             echolog "🎮 Downloading files from Steam..."
             # Here we only download the depots we need instead of the whole game, without specifying ManifestID Steam will download the latest available version. As a side effect this also prevents Steam from downloading unneeded runtimes.
             # This is the Linux dedicated server program:
@@ -243,11 +235,11 @@ if [[ $UPDATE_GAME_BIN == true || $UPDATE_GAME_PAK_MAIN == true || $UPDATE_GAME_
             ${RUNNER}steamcmd/linux32/steamcmd $STEAM_SCRIPT_BASE +login $STEAM_LOGIN +download_depot 533830 533833 +download_depot 533830 533831 +quit >> $CONTAINER_LOGFILE
             if [[ -d "/server/steamcmd/linux32/steamapps/content/app_533830/depot_533831/assets" && -d "/server/steamcmd/linux32/steamapps/content/app_533830/depot_533833/linux" ]]; then
                 # Create the original directory struture so we don't have to modify sbinit.config.
-                if [[ $UPDATE_GAME_PAK_MAIN == true ]]; then
+                if [[ ${UPDATE_GAME_PAK_MAIN,,} == true ]]; then
                     rm -fv "/server/starbound/assets/packed.pak" | tee -a $CONTAINER_LOGFILE
                     mv -fv "/server/steamcmd/linux32/steamapps/content/app_533830/depot_533831/assets/packed.pak" "/server/starbound/assets/packed.pak" | tee -a $CONTAINER_LOGFILE
                 fi
-                if [[ $OPENSTARBOUND == false && $UPDATE_GAME_BIN == true ]]; then
+                if [[ ${OPENSTARBOUND,,} == false && ${UPDATE_GAME_BIN,,} == true ]]; then
                     rm -rfv "/server/starbound/linux" | tee -a $CONTAINER_LOGFILE
                     mv -fv "/server/steamcmd/linux32/steamapps/content/app_533830/depot_533833/linux" "/server/starbound/linux" | tee -a $CONTAINER_LOGFILE
                 fi
@@ -259,20 +251,20 @@ if [[ $UPDATE_GAME_BIN == true || $UPDATE_GAME_PAK_MAIN == true || $UPDATE_GAME_
         fi
     fi
     # Need anything from OpenStarbound?
-    if [[ $OPENSTARBOUND == true && $UPDATE_GAME_BIN == true ]] || [[ $UPDATE_GAME_PAK_OPENSB == true ]]; then
+    if [[ ${OPENSTARBOUND,,} == true && ${UPDATE_GAME_BIN,,} == true ]] || [[ ${UPDATE_GAME_PAK_OPENSB,,} == true ]]; then
         echolog "🎮 Copying OpenStarbond files from image..."
         # Same as above, create the original directory struture.
-        if [[ $UPDATE_GAME_PAK_OPENSB == true ]]; then
+        if [[ ${UPDATE_GAME_PAK_OPENSB,,} == true ]]; then
             cp -fv "/server/openstarbound/assets/opensb.pak" "/server/starbound/assets/opensb.pak" | tee -a $CONTAINER_LOGFILE
         fi
-        if [[ $OPENSTARBOUND == true && $UPDATE_GAME_BIN == true ]]; then
+        if [[ ${OPENSTARBOUND,,} == true && ${UPDATE_GAME_BIN,,} == true ]]; then
             rm -rfv "/server/starbound/linux" | tee -a $CONTAINER_LOGFILE
             cp -rfv "/server/openstarbound/linux" "/server/starbound/linux" | tee -a $CONTAINER_LOGFILE
         fi
     fi
 fi
 
-if [[ $UPDATE_WORKSHOP == true ]]; then
+if [[ ${UPDATE_WORKSHOP,,} == true ]]; then
     echolog "⚙️ Workshop content update enabled."
     WORKSHOP_ALL=""
     WORKSHOP_ALL_COUNT=0
@@ -324,7 +316,7 @@ if [[ $UPDATE_WORKSHOP == true ]]; then
         echolog "  🔧 No workshop collection specified."
     fi
 
-    if [[ $UPDATE_WORKSHOP_FORCE == true ]]; then
+    if [[ ${UPDATE_WORKSHOP_FORCE,,} == true ]]; then
         echolog "  🔧 Combining all the ids..."
         WORKSHOP_ALL_ORIGINAL=$(echo "[[$WORKSHOP_ITEMS_SANITISED],[$WORKSHOP_COLLECTIONS_EXPANDED]]" | jq ".|flatten|unique|join(\",\")" | sed "s/\"//g")
         WORKSHOP_ALL=$WORKSHOP_ALL_ORIGINAL
@@ -407,7 +399,7 @@ if [[ $UPDATE_WORKSHOP == true ]]; then
         echolog "  🔧 Nothing to install."
     fi
 
-    if [[ $WORKSHOP_PRUNE == true ]]; then
+    if [[ ${WORKSHOP_PRUNE,,} == true ]]; then
         echolog "  🔧 Deleting old mods..."
         # Will fail if it is already empty, but this is not a breaking error so I just keep it as is.
         find /server/starbound/steamapps/workshop/content/211820/* -type d | grep -v -E $(echo $WORKSHOP_ALL_ORIGINAL | sed "s/,/\|/g") | xargs -n1 rm -rfv | tee -a $CONTAINER_LOGFILE
@@ -418,8 +410,8 @@ else
     echolog "⚙️ Workshop content update disabled."
 fi
 
-if [[ $LAUNCH_GAME == true ]]; then
-    if [[ $OPENSTARBOUND == false && -f "/server/starbound/assets/opensb.pak" ]]; then
+if [[ ${LAUNCH_GAME,,} == true ]]; then
+    if [[ ${OPENSTARBOUND,,} == false && -f "/server/starbound/assets/opensb.pak" ]]; then
         echolog "  🔧 Running Steam version but opensb.pak exists."
         rm -fv "/server/starbound/assets/opensb.pak" | tee -a $CONTAINER_LOGFILE
     fi
@@ -441,7 +433,7 @@ if [[ $LAUNCH_GAME == true ]]; then
     fi
     echolog "🎮 Launching Starbound..."
     cd "/server/starbound/linux"
-    if [[ $OPENSTARBOUND == true ]]; then
+    if [[ ${OPENSTARBOUND,,} == true ]]; then
         exec ./starbound_server
     else
         exec ${RUNNER}starbound_server
