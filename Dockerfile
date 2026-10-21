@@ -157,6 +157,8 @@ RUN cd /output/openstarbound/linux && \
 
 FROM base AS final
 
+RUN mkdir -m 755 -p /{app/{defaults,osb},data/{backup,base_asset,config,custom_server,logs,mods,steam,storage}}
+
 RUN mkdir -m 755 -p /server/{backup,data,steamcmd/home,starbound/{assets,mods,storage,logs,steamapps}} && \
     groupadd -g 1000 steam && \
     useradd -u 1000 -g steam -d /server/steamcmd/home steam && \
@@ -168,7 +170,7 @@ COPY --chown=root:root   --chmod=755 --from=builder-box64         /output/box64 
 COPY --chown=steam:steam --chmod=755 --from=builder-osb           /output/openstarbound         /server/openstarbound
 COPY --chown=steam:steam --chmod=755 --from=builder-steam         /output/steamcmd              /server/steamcmd
 COPY --chown=steam:steam --chmod=755                              starbound.sh                  /server/
-COPY --chown=steam:steam --chmod=755                              starbound.env.example         /server/data/starbound.env
+COPY --chown=steam:steam --chmod=755                              data/config/config.env.example         /server/data/starbound.env
 EXPOSE 21025/tcp
 STOPSIGNAL SIGINT
 ENTRYPOINT ["/bin/bash", "-c"]
