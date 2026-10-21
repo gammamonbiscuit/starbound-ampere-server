@@ -38,7 +38,7 @@ ENV OPENSTARBOUND_VERSION= \
 
 SHELL ["/bin/bash", "-c"]
 
-FROM debian:trixie-slim as os
+FROM debian:trixie-slim AS os
 
 FROM env AS base
 
@@ -166,11 +166,12 @@ RUN mkdir -m 755 -p /server/{backup,data,steamcmd/home,starbound/{assets,mods,st
 
 USER steam
 WORKDIR /server
-COPY --chown=root:root   --chmod=755 --from=builder-box64         /output/box64                 /
-COPY --chown=steam:steam --chmod=755 --from=builder-osb           /output/openstarbound         /server/openstarbound
-COPY --chown=steam:steam --chmod=755 --from=builder-steam         /output/steamcmd              /server/steamcmd
-COPY --chown=steam:steam --chmod=755                              starbound.sh                  /server/
-COPY --chown=steam:steam --chmod=755                              data/config/config.env.example         /server/data/starbound.env
+COPY --chown=root:root   --chmod=755 --from=builder-box64         /output/box64                        /
+COPY --chown=steam:steam --chmod=755 --from=builder-osb           /output/openstarbound                /server/openstarbound
+COPY --chown=steam:steam --chmod=755 --from=builder-steam         /output/steamcmd                     /server/steamcmd
+COPY --chown=steam:steam --chmod=755                              starbound.sh                         /server/
+COPY --chown=steam:steam --chmod=755                              module.*.sh                          /server/
+COPY --chown=steam:steam --chmod=755                              data/config/config.env.example       /server/data/starbound.env
 EXPOSE 21025/tcp
 STOPSIGNAL SIGINT
 ENTRYPOINT ["/bin/bash", "-c"]

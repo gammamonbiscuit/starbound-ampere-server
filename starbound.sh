@@ -2,6 +2,7 @@
 echo "⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐"
 echo "   Starbound Ampere Server   "
 echo "⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐"
+source ./module.steamcmd.sh
 
 CONTAINER_LOGFILE="/server/data/container.log"
 echolog() {
@@ -158,20 +159,8 @@ fi
 # Update SteamCMD on launch if needed.
 STEAM_SCRIPT_BASE="+@NoPromptForPassword 1 +@sSteamCmdForcePlatformType linux +@sSteamCmdForcePlatformBitness 64 +force_install_dir /server/starbound/"
 if [[ ${UPDATE_STEAM,,} == true || ${UPDATE_GAME,,} == true || ${UPDATE_WORKSHOP,,} == true ]]; then
-    pushd /server/steamcmd > /dev/null
-    if [[ ! -f "linux32/steamcmd" ]]; then
-        echolog "🚧 SteamCMD not found, reinstalling..."
-        curl -L -O "https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz"
-        tar zxvf "steamcmd_linux.tar.gz"
-        rm "steamcmd_linux.tar.gz"
-        # For some reason it needs to update twice?
-        ${RUNNER}linux32/steamcmd $STEAM_SCRIPT_BASE +quit >> $CONTAINER_LOGFILE
-    else
-        echolog "🚧 Updating SteamCMD..."
-    fi
-    ${RUNNER}linux32/steamcmd $STEAM_SCRIPT_BASE +quit >> $CONTAINER_LOGFILE
+    STEAMCMD_WARMUP
     find "package" -name "*.zip.*" -delete | tee -a $CONTAINER_LOGFILE
-    popd > /dev/null
 else
     echolog "🚧 SteamCMD update disabled."
 fi
@@ -232,18 +221,18 @@ if [[ ${UPDATE_GAME_BIN,,} == true || ${UPDATE_GAME_PAK_MAIN,,} == true || ${UPD
             #   https://steamdb.info/depot/533833/
             # And the packed.pak:
             #   https://steamdb.info/depot/533831/
-            ${RUNNER}steamcmd/linux32/steamcmd $STEAM_SCRIPT_BASE +login $STEAM_LOGIN +download_depot 533830 533833 +download_depot 533830 533831 +quit >> $CONTAINER_LOGFILE
-            if [[ -d "/server/steamcmd/linux32/steamapps/content/app_533830/depot_533831/assets" && -d "/server/steamcmd/linux32/steamapps/content/app_533830/depot_533833/linux" ]]; then
+            STEAMCMD_RUN $STEAM_SCRIPT_BASE +login $STEAM_LOGIN +download_depot 533830 533833 +download_depot 533830 533831 +quit >> $CONTAINER_LOGFILE
+            if [[ -d "/server/steamcmd/linux64/steamapps/content/app_533830/depot_533831/assets" && -d "/server/steamcmd/linux64/steamapps/content/app_533830/depot_533833/linux" ]]; then
                 # Create the original directory struture so we don't have to modify sbinit.config.
                 if [[ ${UPDATE_GAME_PAK_MAIN,,} == true ]]; then
                     rm -fv "/server/starbound/assets/packed.pak" | tee -a $CONTAINER_LOGFILE
-                    mv -fv "/server/steamcmd/linux32/steamapps/content/app_533830/depot_533831/assets/packed.pak" "/server/starbound/assets/packed.pak" | tee -a $CONTAINER_LOGFILE
+                    mv -fv "/server/steamcmd/linux64/steamapps/content/app_533830/depot_533831/assets/packed.pak" "/server/starbound/assets/packed.pak" | tee -a $CONTAINER_LOGFILE
                 fi
                 if [[ ${OPENSTARBOUND,,} == false && ${UPDATE_GAME_BIN,,} == true ]]; then
                     rm -rfv "/server/starbound/linux" | tee -a $CONTAINER_LOGFILE
-                    mv -fv "/server/steamcmd/linux32/steamapps/content/app_533830/depot_533833/linux" "/server/starbound/linux" | tee -a $CONTAINER_LOGFILE
+                    mv -fv "/server/steamcmd/linux64/steamapps/content/app_533830/depot_533833/linux" "/server/starbound/linux" | tee -a $CONTAINER_LOGFILE
                 fi
-                rm -rfv "/server/steamcmd/linux32/steamapps" | tee -a $CONTAINER_LOGFILE
+                rm -rfv "/server/steamcmd/linux64/steamapps" | tee -a $CONTAINER_LOGFILE
             else
                 echolog "❌ Failed to download from Steam, abort."
                 exit 1
@@ -358,7 +347,7 @@ if [[ ${UPDATE_WORKSHOP,,} == true ]]; then
                 # This will loop 1+WORKSHOP_MAX_RETRY times.
                 for ((LOOP_TEMP_WORKSHOP_RETRY = 0 ; LOOP_TEMP_WORKSHOP_RETRY <= WORKSHOP_MAX_RETRY ; LOOP_TEMP_WORKSHOP_RETRY++ )); do
                     rm -f "/server/steamcmd/home/Steam/logs/workshop_log.txt"
-                    ${RUNNER}steamcmd/linux32/steamcmd $STEAM_SCRIPT_BASE +login anonymous $LOOP_TMP_WORKSHOP_SCRIPT +quit >> $CONTAINER_LOGFILE
+                    STEAMCMD_RUN $STEAM_SCRIPT_BASE +login anonymous $LOOP_TMP_WORKSHOP_SCRIPT +quit >> $CONTAINER_LOGFILE
                     # Check if this group is downloaded successfully, mark down the unsuccessful ones.
                     for LOOP_TMP_WORKSHOP_ID_ITEM in ${LOOP_TMP_WORKSHOP_ID//,/ }; do
                         if grep -swq "Download item $LOOP_TMP_WORKSHOP_ID_ITEM result \: OK" "/server/steamcmd/home/Steam/logs/workshop_log.txt"; then
