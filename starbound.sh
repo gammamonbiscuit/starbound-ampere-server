@@ -255,70 +255,69 @@ fi
 
 if [[ ${UPDATE_WORKSHOP,,} == true ]]; then
     echolog "⚙️ Workshop content update enabled."
-    WORKSHOP_ALL=""
-    WORKSHOP_ALL_COUNT=0
-    # Removes anything non-digit, deduplication and sort, and output a comma-separated list.
-    WORKSHOP_ITEMS_SANITISED=$(echo "["$(echo $WORKSHOP_ITEMS | sed -re "s/[^0-9]+/,/g;s/\,$//;s/^,//")"]" | jq "unique|join(\",\")" | sed "s/\"//g")
-    WORKSHOP_COLLECTIONS_SANITISED=$(echo "["$(echo $WORKSHOP_COLLECTIONS | sed -re "s/[^0-9]+/,/g;s/\,$//;s/^,//")"]" | jq "unique|join(\",\")" | sed "s/\"//g")
-    if [[ -n "$WORKSHOP_ITEMS_SANITISED" ]]; then
-        WORKSHOP_ITEMS_COUNT=$(echo $WORKSHOP_ITEMS_SANITISED, | tr -cd "," | wc -c)
-        echolog "  🔧 $WORKSHOP_ITEMS_COUNT individual item(s)"
-        echolog "    📖 $WORKSHOP_ITEMS_SANITISED"
-    else
-        echolog "  🔧 No individual workshop item specified."
-    fi
-    if [[ -n "$WORKSHOP_COLLECTIONS_SANITISED" ]]; then
-        WORKSHOP_COLLECTIONS_COUNT=$(echo $WORKSHOP_COLLECTIONS_SANITISED, | tr -cd "," | wc -c)
-        echolog "  🔧 $WORKSHOP_COLLECTIONS_COUNT collection(s)"
-        echolog "    📖 $WORKSHOP_COLLECTIONS_SANITISED"
-        # Document:
-        # https://steamapi.xpaw.me/#ISteamRemoteStorage/GetCollectionDetails
-        # For querying a list N with n ids, send the following POST request to Steam API:
-        # https://api.steampowered.com/ISteamRemoteStorage/GetCollectionDetails/v1/
-        #        ?collectioncount=n
-        #        &publishedfileids[0]=N1
-        #        &publishedfileids[1]=N2
-        #        ...
-        #        &publishedfileids[n-1]=Nn
-        WORKSHOP_COLLECTIONS_QUERY="collectioncount=$WORKSHOP_COLLECTIONS_COUNT"
-        for COLLECTION in ${WORKSHOP_COLLECTIONS_SANITISED//,/ }; do
-            ((WORKSHOP_COLLECTIONS_COUNT--))
-            WORKSHOP_COLLECTIONS_QUERY+="&publishedfileids%5B$WORKSHOP_COLLECTIONS_COUNT%5D=$COLLECTION"
-        done
-        echolog "    ☁️ Calling Steam API to get collection data..."
-        WORKSHOP_COLLECTIONS_EXPANDED=$(curl -s "https://api.steampowered.com/ISteamRemoteStorage/GetCollectionDetails/v1/" -d $WORKSHOP_COLLECTIONS_QUERY)
-        if jq -e . >/dev/null 2>&1 <<<$WORKSHOP_COLLECTIONS_EXPANDED; then
-            WORKSHOP_COLLECTIONS_EXPANDED=$(echo $WORKSHOP_COLLECTIONS_EXPANDED | jq "[.response.collectiondetails.[].children|select(.!=null).[].publishedfileid|tonumber]|unique|join(\",\")" | sed "s/\"//g")
-            if [[ -n "$WORKSHOP_COLLECTIONS_EXPANDED" ]]; then
-                WORKSHOP_COLLECTIONS_EXPANDED_COUNT=$(echo $WORKSHOP_COLLECTIONS_EXPANDED, | tr -cd , | wc -c)
-                echolog "    ☁️ $WORKSHOP_COLLECTIONS_EXPANDED_COUNT individual item(s)"
-                echolog "      📖 $WORKSHOP_COLLECTIONS_EXPANDED"
-            else
-                echolog "    ❌ Failed to retrive data, abort."
-                exit 1
-            fi
-        else
-            echolog "    ❌ Failed to retrive data, abort."
+
+    # Removes anything non-digit, keep numbers that are 9-10 digits, deduplication and sort, and output a json array.
+    WORKSHOP_LIST_TO_JSON() {
+        jq --null-input --arg LIST "$1" '[$LIST | scan("\\b[0-9]{9,10}\\b")] | unique'
+    }
+
+    # Convert the json array to comma list.
+    WORKSHOP_JSON_TO_LIST() {
+        jq --null-input --raw-output --argjson LIST "$1" '$LIST | map(.) | join(",")'
+    }
+
+    # Convert the json array to Steam API POST body.
+    WORKSHOP_JSON_TO_QUERY() {
+        jq --null-input --raw-output --arg NAME "$1" --argjson IDS "$2" '"\($NAME)=\($IDS | length)&" + ($IDS | to_entries | map("publishedfileids[\(.key)]=\(.value)") | join("&"))'
+    }
+
+    WORKSHOP_ITEMS_JSON=$(WORKSHOP_LIST_TO_JSON "$WORKSHOP_ITEMS")
+    WORKSHOP_ITEMS_COUNT=$(echo $WORKSHOP_ITEMS_JSON | jq 'length')
+    echo "  📖 Items (${WORKSHOP_ITEMS_COUNT}): $(WORKSHOP_JSON_TO_LIST "$WORKSHOP_ITEMS_JSON")"
+
+    WORKSHOP_COLLECTIONS_JSON=$(WORKSHOP_LIST_TO_JSON "$WORKSHOP_COLLECTIONS")
+    WORKSHOP_COLLECTIONS_COUNT=$(echo "$WORKSHOP_COLLECTIONS_JSON" | jq 'length')
+    echo "  📖 Collections (${WORKSHOP_COLLECTIONS_COUNT}): $(WORKSHOP_JSON_TO_LIST "$WORKSHOP_COLLECTIONS_JSON")"
+
+    echo "  🔧 Combining all the ids..."
+    if [[ $WORKSHOP_COLLECTIONS_COUNT -gt 0 ]]; then
+        # https://steamapi.xpaw.me/ISteamRemoteStorage#GetCollectionDetails
+        WORKSHOP_COLLECTIONS_EXPANDED=$(
+            curl -fsS "https://api.steampowered.com/ISteamRemoteStorage/GetCollectionDetails/v1/" -d "$(WORKSHOP_JSON_TO_QUERY collectioncount "$WORKSHOP_COLLECTIONS_JSON")" |
+            jq '[.response.collectiondetails[].children[]?.publishedfileid]'
+        )
+        if [[ -z "$WORKSHOP_COLLECTIONS_EXPANDED" ]]; then
+            echo "    ❌ Steam API GetCollectionDetails failed, abort."
             exit 1
         fi
     else
-        echolog "  🔧 No workshop collection specified."
+        WORKSHOP_COLLECTIONS_EXPANDED='[]'
     fi
 
-    if [[ ${UPDATE_WORKSHOP_FORCE,,} == true ]]; then
-        echolog "  🔧 Combining all the ids..."
-        WORKSHOP_ALL_ORIGINAL=$(echo "[[$WORKSHOP_ITEMS_SANITISED],[$WORKSHOP_COLLECTIONS_EXPANDED]]" | jq ".|flatten|unique|join(\",\")" | sed "s/\"//g")
-        WORKSHOP_ALL=$WORKSHOP_ALL_ORIGINAL
+    WORKSHOP_COMBINED_JSON=$(jq --null-input --argjson I "$WORKSHOP_ITEMS_JSON" --argjson C "$WORKSHOP_COLLECTIONS_EXPANDED" '$I + $C | unique')
+    WORKSHOP_COMBINED_COUNT=$(echo "$WORKSHOP_COMBINED_JSON" | jq 'length')
+
+    if [[ $WORKSHOP_COMBINED_COUNT -gt 0 ]]; then
+        # https://steamapi.xpaw.me/ISteamRemoteStorage#GetPublishedFileDetails
+        WORKSHOP_FINAL_JSON=$(
+            curl -fsS "https://api.steampowered.com/ISteamRemoteStorage/GetPublishedFileDetails/v1/" -d "$(WORKSHOP_JSON_TO_QUERY itemcount "$WORKSHOP_COMBINED_JSON")" |
+            jq '[.response.publishedfiledetails[] | select(.consumer_app_id == 211820) | {title, publishedfileid, time_updated}]'
+        )
+        if [[ -z "$WORKSHOP_FINAL_JSON" ]]; then
+            echo "    ❌ Steam API GetPublishedFileDetails failed, abort."
+            exit 1
+        fi
     else
-        echolog "  🔧 Combining all the ids (skip existing mods)..."
-        WORKSHOP_ALL_ORIGINAL=$(echo "[[$WORKSHOP_ITEMS_SANITISED],[$WORKSHOP_COLLECTIONS_EXPANDED]]" | jq ".|flatten|unique|join(\",\")" | sed "s/\"//g")
-        for LOOP_TMP_ITEM in ${WORKSHOP_ALL_ORIGINAL//,/ }; do
-            if [[ ! -d "/server/starbound/steamapps/workshop/content/211820/$LOOP_TMP_ITEM" ]]; then
-                WORKSHOP_ALL+=$LOOP_TMP_ITEM,
-            fi
-        done
-        WORKSHOP_ALL=${WORKSHOP_ALL%*,}
+        WORKSHOP_FINAL_JSON='[]'
     fi
+
+    WORKSHOP_FINAL_COUNT=$(echo "$WORKSHOP_FINAL_JSON" | jq 'length')
+    WORKSHOP_FINAL_IDS=$(echo "$WORKSHOP_FINAL_JSON" | jq --raw-output 'map(.publishedfileid) | join(",")')
+
+    echo "      📖 ${WORKSHOP_ITEMS_COUNT} item(s) + ${WORKSHOP_COLLECTIONS_COUNT} collection(s) -> ${WORKSHOP_COMBINED_COUNT} checked -> ${WORKSHOP_FINAL_COUNT} valid."
+    echo "      📖 ${WORKSHOP_FINAL_IDS:-Empty}"
+
+    WORKSHOP_ALL=$WORKSHOP_FINAL_IDS
 
     if [[ -n "$WORKSHOP_ALL" ]]; then
         WORKSHOP_ALL_COUNT=$(echo $WORKSHOP_ALL, | tr -cd "," | wc -c)
