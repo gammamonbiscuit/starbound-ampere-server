@@ -257,37 +257,37 @@ if [[ ${UPDATE_WORKSHOP,,} == true ]]; then
     echolog "⚙️ Workshop content update enabled."
 
     # Removes anything non-digit, keep numbers that are 9-10 digits, deduplication and sort, and output a json array.
-    WORKSHOP_LIST_TO_JSON() {
+    WORKSHOP_LIST_TO_ARRAY() {
         jq --null-input --arg LIST "$1" '[$LIST | scan("\\b[0-9]{9,10}\\b")] | unique'
     }
 
     # Convert the json array to comma list.
-    WORKSHOP_JSON_TO_LIST() {
+    WORKSHOP_ARRAY_TO_LIST() {
         jq --null-input --raw-output --argjson LIST "$1" '$LIST | map(.) | join(",")'
     }
 
     # Convert the json array to Steam API POST body.
-    WORKSHOP_JSON_TO_QUERY() {
+    WORKSHOP_ARRAY_TO_QUERY() {
         jq --null-input --raw-output --arg NAME "$1" --argjson IDS "$2" '"\($NAME)=\($IDS | length)&" + ($IDS | to_entries | map("publishedfileids[\(.key)]=\(.value)") | join("&"))'
     }
 
-    WORKSHOP_ITEMS_JSON=$(WORKSHOP_LIST_TO_JSON "$WORKSHOP_ITEMS")
+    WORKSHOP_ITEMS_JSON=$(WORKSHOP_LIST_TO_ARRAY "$WORKSHOP_ITEMS")
     WORKSHOP_ITEMS_COUNT=$(echo $WORKSHOP_ITEMS_JSON | jq 'length')
-    echo "  📖 Items (${WORKSHOP_ITEMS_COUNT}): $(WORKSHOP_JSON_TO_LIST "$WORKSHOP_ITEMS_JSON")"
+    echolog "  📖 Items (${WORKSHOP_ITEMS_COUNT}): $(WORKSHOP_ARRAY_TO_LIST "$WORKSHOP_ITEMS_JSON")"
 
-    WORKSHOP_COLLECTIONS_JSON=$(WORKSHOP_LIST_TO_JSON "$WORKSHOP_COLLECTIONS")
+    WORKSHOP_COLLECTIONS_JSON=$(WORKSHOP_LIST_TO_ARRAY "$WORKSHOP_COLLECTIONS")
     WORKSHOP_COLLECTIONS_COUNT=$(echo "$WORKSHOP_COLLECTIONS_JSON" | jq 'length')
-    echo "  📖 Collections (${WORKSHOP_COLLECTIONS_COUNT}): $(WORKSHOP_JSON_TO_LIST "$WORKSHOP_COLLECTIONS_JSON")"
+    echolog "  📖 Collections (${WORKSHOP_COLLECTIONS_COUNT}): $(WORKSHOP_ARRAY_TO_LIST "$WORKSHOP_COLLECTIONS_JSON")"
 
-    echo "  🔧 Combining all the ids..."
+    echolog "  🔧 Combining all the ids..."
     if [[ $WORKSHOP_COLLECTIONS_COUNT -gt 0 ]]; then
         # https://steamapi.xpaw.me/ISteamRemoteStorage#GetCollectionDetails
         WORKSHOP_COLLECTIONS_EXPANDED=$(
-            curl -fsS "https://api.steampowered.com/ISteamRemoteStorage/GetCollectionDetails/v1/" -d "$(WORKSHOP_JSON_TO_QUERY collectioncount "$WORKSHOP_COLLECTIONS_JSON")" |
+            curl -fsS "https://api.steampowered.com/ISteamRemoteStorage/GetCollectionDetails/v1/" -d "$(WORKSHOP_ARRAY_TO_QUERY collectioncount "$WORKSHOP_COLLECTIONS_JSON")" |
             jq '[.response.collectiondetails[].children[]?.publishedfileid]'
         )
         if [[ -z "$WORKSHOP_COLLECTIONS_EXPANDED" ]]; then
-            echo "    ❌ Steam API GetCollectionDetails failed, abort."
+            echolog "    ❌ Steam API GetCollectionDetails failed, abort."
             exit 1
         fi
     else
@@ -300,11 +300,11 @@ if [[ ${UPDATE_WORKSHOP,,} == true ]]; then
     if [[ $WORKSHOP_COMBINED_COUNT -gt 0 ]]; then
         # https://steamapi.xpaw.me/ISteamRemoteStorage#GetPublishedFileDetails
         WORKSHOP_FINAL_JSON=$(
-            curl -fsS "https://api.steampowered.com/ISteamRemoteStorage/GetPublishedFileDetails/v1/" -d "$(WORKSHOP_JSON_TO_QUERY itemcount "$WORKSHOP_COMBINED_JSON")" |
+            curl -fsS "https://api.steampowered.com/ISteamRemoteStorage/GetPublishedFileDetails/v1/" -d "$(WORKSHOP_ARRAY_TO_QUERY itemcount "$WORKSHOP_COMBINED_JSON")" |
             jq '[.response.publishedfiledetails[] | select(.consumer_app_id == 211820) | {title, publishedfileid, time_updated}]'
         )
         if [[ -z "$WORKSHOP_FINAL_JSON" ]]; then
-            echo "    ❌ Steam API GetPublishedFileDetails failed, abort."
+            echolog "    ❌ Steam API GetPublishedFileDetails failed, abort."
             exit 1
         fi
     else
@@ -314,8 +314,8 @@ if [[ ${UPDATE_WORKSHOP,,} == true ]]; then
     WORKSHOP_FINAL_COUNT=$(echo "$WORKSHOP_FINAL_JSON" | jq 'length')
     WORKSHOP_FINAL_IDS=$(echo "$WORKSHOP_FINAL_JSON" | jq --raw-output 'map(.publishedfileid) | join(",")')
 
-    echo "      📖 ${WORKSHOP_ITEMS_COUNT} item(s) + ${WORKSHOP_COLLECTIONS_COUNT} collection(s) -> ${WORKSHOP_COMBINED_COUNT} checked -> ${WORKSHOP_FINAL_COUNT} valid."
-    echo "      📖 ${WORKSHOP_FINAL_IDS:-Empty}"
+    echolog "      📖 ${WORKSHOP_ITEMS_COUNT} item(s) + ${WORKSHOP_COLLECTIONS_COUNT} collection(s) -> ${WORKSHOP_COMBINED_COUNT} checked -> ${WORKSHOP_FINAL_COUNT} valid."
+    echolog "      📖 ${WORKSHOP_FINAL_IDS:-Empty}"
 
     WORKSHOP_ALL=$WORKSHOP_FINAL_IDS
 
