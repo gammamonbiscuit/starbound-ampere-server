@@ -377,6 +377,14 @@ if [[ ${UPDATE_WORKSHOP,,} == true ]]; then
 
     echolog "      📖 Changes: ${WORKSHOP_DELTA_NEW_COUNT} new, ${WORKSHOP_DELTA_MODIFY_COUNT} updated, ${WORKSHOP_DELTA_DELETE_COUNT} removed."
 
+    if [[ $WORKSHOP_DELTA_DELETE_COUNT -gt 0 ]]; then
+        echolog "  🔧 Removing ${WORKSHOP_DELTA_DELETE_COUNT} unlisted mod(s)..."
+        for ID in $(echo "$WORKSHOP_DELTA_JSON" | jq --raw-output '.DELETE[].publishedfileid'); do
+            echolog "      🗑️ ${ID}"
+            rm -rfv "${WORKSHOP_CONTENT_DIR}/${ID}" | tee -a $CONTAINER_LOGFILE
+        done
+    fi
+
     if [[ $WORKSHOP_DELTA_NEW_COUNT -gt 0 || $WORKSHOP_DELTA_MODIFY_COUNT -gt 0 ]]; then
         WORKSHOP_ALL=$(echo "$WORKSHOP_DELTA_JSON" | jq --raw-output '.NEW+.MODIFY | [.[].publishedfileid] | join(",")')
         WORKSHOP_ALL_COUNT=$(echo $WORKSHOP_ALL, | tr -cd "," | wc -c)
