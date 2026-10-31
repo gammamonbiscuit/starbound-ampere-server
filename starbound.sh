@@ -399,7 +399,6 @@ if [[ ${UPDATE_WORKSHOP,,} == true ]]; then
             LOOP_TMP_WORKSHOP_SCRIPT+="+workshop_download_item 211820 $LOOP_TMP_ITEM validate "
             if [[ $(($LOOP_COUNT%$WORKSHOP_CHUNK)) == 0 || $LOOP_COUNT == $WORKSHOP_ALL_COUNT ]]; then
                 LOOP_TMP_WORKSHOP_ID=${LOOP_TMP_WORKSHOP_ID%*,}
-                LOOP_TEMP_WORKSHOP_SUCCESS=1
                 echolog "  🔧 Downloading mod $LOOP_TMP_PREVIOUS_START to $LOOP_COUNT"
                 echolog "    📖 $LOOP_TMP_WORKSHOP_ID"
                 # This will loop 1+WORKSHOP_MAX_RETRY times.
@@ -407,6 +406,7 @@ if [[ ${UPDATE_WORKSHOP,,} == true ]]; then
                     rm -f "/server/steamcmd/home/Steam/logs/workshop_log.txt"
                     STEAMCMD_RUN $STEAM_SCRIPT_BASE +login anonymous $LOOP_TMP_WORKSHOP_SCRIPT +quit >> $CONTAINER_LOGFILE
                     # Check if this group is downloaded successfully, mark down the unsuccessful ones.
+                    LOOP_TEMP_WORKSHOP_SUCCESS=1
                     for LOOP_TMP_WORKSHOP_ID_ITEM in ${LOOP_TMP_WORKSHOP_ID//,/ }; do
                         if grep -swq "Download item $LOOP_TMP_WORKSHOP_ID_ITEM result \: OK" "/server/steamcmd/home/Steam/logs/workshop_log.txt"; then
                             LOOP_TEMP_WORKSHOP_SUCCESS=$(($LOOP_TEMP_WORKSHOP_SUCCESS & 1))
@@ -415,7 +415,7 @@ if [[ ${UPDATE_WORKSHOP,,} == true ]]; then
                             LOOP_TEMP_WORKSHOP_SUCCESS=$(($LOOP_TEMP_WORKSHOP_SUCCESS & 0))
                             echolog "    ❌ $LOOP_TMP_WORKSHOP_ID_ITEM"
                             LOOP_TMP_WORKSHOP_ID_RETRY+=$LOOP_TMP_WORKSHOP_ID_ITEM","
-                            LOOP_TMP_WORKSHOP_SCRIPT_RETRY+="+workshop_download_item 211820 $LOOP_TMP_ITEM validate "
+                            LOOP_TMP_WORKSHOP_SCRIPT_RETRY+="+workshop_download_item 211820 $LOOP_TMP_WORKSHOP_ID_ITEM validate "
                         fi
                     done
                     # All success       -> Break the loop
@@ -428,7 +428,7 @@ if [[ ${UPDATE_WORKSHOP,,} == true ]]; then
                         else
                             echolog "  ❌ Download failed, retry $(($LOOP_TEMP_WORKSHOP_RETRY+1))/$WORKSHOP_MAX_RETRY in 30 seconds."
                             LOOP_TMP_WORKSHOP_ID=${LOOP_TMP_WORKSHOP_ID_RETRY%*,}
-                            LOOP_TMP_WORKSHOP_SCRIPT=LOOP_TMP_WORKSHOP_SCRIPT_RETRY
+                            LOOP_TMP_WORKSHOP_SCRIPT=$LOOP_TMP_WORKSHOP_SCRIPT_RETRY
                             LOOP_TMP_WORKSHOP_ID_RETRY=""
                             LOOP_TMP_WORKSHOP_SCRIPT_RETRY=""
                             sleep 30
