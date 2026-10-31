@@ -254,6 +254,9 @@ if [[ ${UPDATE_GAME_BIN,,} == true || ${UPDATE_GAME_PAK_MAIN,,} == true || ${UPD
 fi
 
 if [[ ${UPDATE_WORKSHOP,,} == true ]]; then
+    WORKSHOP_ROOT="/server/starbound"
+    WORKSHOP_CONTENT_DIR="${WORKSHOP_ROOT}/steamapps/workshop/content/211820"
+
     echolog "⚙️ Workshop content update enabled."
 
     # Removes anything non-digit, keep numbers that are 9-10 digits, deduplication and sort, and output a json array.
@@ -263,7 +266,7 @@ if [[ ${UPDATE_WORKSHOP,,} == true ]]; then
 
     # Convert the json array to comma list.
     WORKSHOP_ARRAY_TO_LIST() {
-        jq --null-input --raw-output --argjson LIST "$1" '$LIST | map(.) | join(",")'
+        jq --null-input --raw-output --argjson LIST "$1" '$LIST | join(",")'
     }
 
     # Convert the json array to Steam API POST body.
@@ -272,7 +275,7 @@ if [[ ${UPDATE_WORKSHOP,,} == true ]]; then
     }
 
     WORKSHOP_ITEMS_JSON=$(WORKSHOP_LIST_TO_ARRAY "$WORKSHOP_ITEMS")
-    WORKSHOP_ITEMS_COUNT=$(echo $WORKSHOP_ITEMS_JSON | jq 'length')
+    WORKSHOP_ITEMS_COUNT=$(echo "$WORKSHOP_ITEMS_JSON" | jq 'length')
     echolog "  📖 Items (${WORKSHOP_ITEMS_COUNT}): $(WORKSHOP_ARRAY_TO_LIST "$WORKSHOP_ITEMS_JSON")"
 
     WORKSHOP_COLLECTIONS_JSON=$(WORKSHOP_LIST_TO_ARRAY "$WORKSHOP_COLLECTIONS")
@@ -291,7 +294,7 @@ if [[ ${UPDATE_WORKSHOP,,} == true ]]; then
             exit 1
         fi
     else
-        WORKSHOP_COLLECTIONS_EXPANDED='[]'
+        WORKSHOP_COLLECTIONS_EXPANDED="[]"
     fi
 
     WORKSHOP_COMBINED_JSON=$(jq --null-input --argjson I "$WORKSHOP_ITEMS_JSON" --argjson C "$WORKSHOP_COLLECTIONS_EXPANDED" '$I + $C | unique')
@@ -301,27 +304,83 @@ if [[ ${UPDATE_WORKSHOP,,} == true ]]; then
         # https://steamapi.xpaw.me/ISteamRemoteStorage#GetPublishedFileDetails
         WORKSHOP_FINAL_JSON=$(
             curl -fsS "https://api.steampowered.com/ISteamRemoteStorage/GetPublishedFileDetails/v1/" -d "$(WORKSHOP_ARRAY_TO_QUERY itemcount "$WORKSHOP_COMBINED_JSON")" |
-            jq '[.response.publishedfiledetails[] | select(.consumer_app_id == 211820) | {title, publishedfileid, time_updated}]'
+            jq '[.response.publishedfiledetails[] | select(.consumer_app_id == 211820) | {title, publishedfileid, time_updated, file_size}]'
         )
         if [[ -z "$WORKSHOP_FINAL_JSON" ]]; then
             echolog "    ❌ Steam API GetPublishedFileDetails failed, abort."
             exit 1
         fi
     else
-        WORKSHOP_FINAL_JSON='[]'
+        WORKSHOP_FINAL_JSON="[]"
     fi
 
     WORKSHOP_FINAL_COUNT=$(echo "$WORKSHOP_FINAL_JSON" | jq 'length')
-    WORKSHOP_FINAL_IDS=$(echo "$WORKSHOP_FINAL_JSON" | jq --raw-output 'map(.publishedfileid) | join(",")')
-
     echolog "      📖 ${WORKSHOP_ITEMS_COUNT} item(s) + ${WORKSHOP_COLLECTIONS_COUNT} collection(s) -> ${WORKSHOP_COMBINED_COUNT} checked -> ${WORKSHOP_FINAL_COUNT} valid."
-    echolog "      📖 ${WORKSHOP_FINAL_IDS:-Empty}"
 
-    WORKSHOP_ALL=$WORKSHOP_FINAL_IDS
+    echolog "  🔧 Checking existing workshop content..."
+    if [[ ! -f "/server/data/workshop_data.json" ]]; then
+        echo "[]" > "/server/data/workshop_data.json"
+    fi
+    WORKSHOP_CURRENT_JSON=$(</server/data/workshop_data.json)
+    WORKSHOP_CURRENT_IDS=$(echo "$WORKSHOP_CURRENT_JSON" | jq --raw-output '.[].publishedfileid')
+    WORKSHOP_CURRENT_MISMATCH=()
 
-    if [[ -n "$WORKSHOP_ALL" ]]; then
+    shopt -s nullglob
+    for DIR in "${WORKSHOP_CONTENT_DIR}"/*/; do
+        ID=${DIR%/}
+        ID=${ID##*/}
+        if ! echo "$WORKSHOP_CURRENT_IDS" | grep -Fxq -- "$ID"; then
+            echolog "      🗑️ ${ID}: Exists on disk but not in record."
+            rm -rfv "${DIR}" | tee -a $CONTAINER_LOGFILE
+            continue
+        fi
+        RECORDED=$(echo "$WORKSHOP_CURRENT_JSON" | jq --arg ID "$ID" --raw-output '.[] | select(.publishedfileid == $ID) | .file_size // 0')
+        SIZE=0
+        for PAK in "${DIR}"*.pak; do
+            ((SIZE += $(stat -c%s "${PAK}")))
+        done
+        if [[ "$SIZE" -ne "$RECORDED" ]]; then
+            echolog "      ⚠️ ${ID}: Size mismatch (disk ${SIZE}, record ${RECORDED})."
+            rm -rfv "${DIR}" | tee -a $CONTAINER_LOGFILE
+            WORKSHOP_CURRENT_MISMATCH+=("${ID}")
+        fi
+    done
+    shopt -u nullglob
+
+    for ID in $WORKSHOP_CURRENT_IDS; do
+        if [[ ! -d "${WORKSHOP_CONTENT_DIR}/${ID}" ]]; then
+            echolog "      ⚠️ ${ID}: Exists in record but not on disk (could be deleted by the size check)."
+            WORKSHOP_CURRENT_MISMATCH+=("${ID}")
+        fi
+    done
+
+    if [[ ${#WORKSHOP_CURRENT_MISMATCH[@]} -gt 0 ]]; then
+        WORKSHOP_CURRENT_MISMATCH_JSON=$(WORKSHOP_LIST_TO_ARRAY "$(printf '%s,' "${WORKSHOP_CURRENT_MISMATCH[@]}")")
+        WORKSHOP_CURRENT_JSON=$(jq --null-input --argjson C "$WORKSHOP_CURRENT_JSON" --argjson M "$WORKSHOP_CURRENT_MISMATCH_JSON" '$C | map(if (.publishedfileid as $ID | ($M | index($ID))) then .file_size = "0" else . end)')
+    fi
+
+    WORKSHOP_DELTA_JSON=$(jq --null-input --argjson F "$WORKSHOP_FINAL_JSON" --argjson C "$WORKSHOP_CURRENT_JSON" '
+        [$F[].publishedfileid] as $FIDS |
+        [$C[].publishedfileid] as $CIDS |
+        {
+            NEW:    [$F[] | select(.publishedfileid as $ID | ($CIDS | index($ID) | not))],
+            DELETE: [$C[] | select(.publishedfileid as $ID | ($FIDS | index($ID) | not))],
+            MODIFY: [$F[] | . as $f
+                        | $C[] | select(.publishedfileid == $f.publishedfileid)
+                        | select(.time_updated != $f.time_updated or .file_size != $f.file_size)
+                        | $f]
+        }')
+
+    WORKSHOP_DELTA_NEW_COUNT=$(echo "$WORKSHOP_DELTA_JSON" | jq '.NEW | length')
+    WORKSHOP_DELTA_DELETE_COUNT=$(echo "$WORKSHOP_DELTA_JSON" | jq '.DELETE | length')
+    WORKSHOP_DELTA_MODIFY_COUNT=$(echo "$WORKSHOP_DELTA_JSON" | jq '.MODIFY | length')
+
+    echolog "      📖 Changes: ${WORKSHOP_DELTA_NEW_COUNT} new, ${WORKSHOP_DELTA_MODIFY_COUNT} updated, ${WORKSHOP_DELTA_DELETE_COUNT} removed."
+
+    if [[ $WORKSHOP_DELTA_NEW_COUNT -gt 0 || $WORKSHOP_DELTA_MODIFY_COUNT -gt 0 ]]; then
+        WORKSHOP_ALL=$(echo "$WORKSHOP_DELTA_JSON" | jq --raw-output '.NEW+.MODIFY | [.[].publishedfileid] | join(",")')
         WORKSHOP_ALL_COUNT=$(echo $WORKSHOP_ALL, | tr -cd "," | wc -c)
-        echolog "  🔧 $WORKSHOP_ALL_COUNT individual item(s)"
+        echolog "  🔧 $WORKSHOP_ALL_COUNT item(s) to download."
         echolog "    📖 $WORKSHOP_ALL"
         echolog "  🔧 Currently installed workshop mods: "$(find /server/starbound/steamapps/workshop/content/211820/* -type d | wc -l)
         LOOP_COUNT=0
@@ -387,13 +446,7 @@ if [[ ${UPDATE_WORKSHOP,,} == true ]]; then
         echolog "  🔧 Nothing to install."
     fi
 
-    if [[ ${WORKSHOP_PRUNE,,} == true ]]; then
-        echolog "  🔧 Deleting old mods..."
-        # Will fail if it is already empty, but this is not a breaking error so I just keep it as is.
-        find /server/starbound/steamapps/workshop/content/211820/* -type d | grep -v -E $(echo $WORKSHOP_ALL_ORIGINAL | sed "s/,/\|/g") | xargs -n1 rm -rfv | tee -a $CONTAINER_LOGFILE
-    else
-        echolog "  🔧 Prune disabled."
-    fi
+    echo "$WORKSHOP_FINAL_JSON" > "/server/data/workshop_data.json"
 else
     echolog "⚙️ Workshop content update disabled."
 fi
