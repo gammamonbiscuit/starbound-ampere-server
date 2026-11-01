@@ -5,9 +5,6 @@ echo "⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐"
 source ./module.steamcmd.sh
 
 CONTAINER_LOGFILE="/server/data/container.log"
-echolog() {
-    echo "$1" | tee -a $CONTAINER_LOGFILE
-}
 
 echo "🚧 Permission check"
 PERMISSION_CHECK=("/server" "/server/starbound" "/server/steamcmd" "/server/data" "/server/backup")
@@ -26,11 +23,13 @@ for LOOP_PERMISSION_CHECK in "${PERMISSION_CHECK[@]}"; do
     fi
 done
 
-mkdir -m 755 -p /server/{backup,data,steamcmd/home,starbound/{assets,mods,storage,logs,steamapps}}
-echo "🚧 Logging started" | tee $CONTAINER_LOGFILE
 
+echo "🚧 Logging started" | tee "$CONTAINER_LOGFILE"
+{
+
+mkdir -m 755 -p /server/{backup,data,steamcmd/home,starbound/{assets,mods,storage,logs,steamapps}}
 if [[ ! -f "/server/data/starbound.env" ]]; then
-    echolog "🚧 Creating config file..."
+    echo "🚧 Creating config file..."
     tee "/server/data/starbound.env" <<EOF >/dev/null
 # Your Steam credentials, required to download the game, workshop mods are always downloaded anonymously.
 # Default: "anonymous"
@@ -107,148 +106,148 @@ WORKSHOP_MAX_RETRY=$WORKSHOP_MAX_RETRY
 
 EOF
 else
-    echolog "🚧 Reading config file..."
+    echo "🚧 Reading config file..."
     source "/server/data/starbound.env"
 fi
 
 # Decide how to run programs.
 if [[ "$TARGETPLATFORM" == "linux/amd64" ]]; then
     RUNNER='./'
-    echolog "🚧 x86"
+    echo "🚧 x86"
 else
     RUNNER='box64 '
-    echolog "🚧 arm64, ${RUNNER}"
+    echo "🚧 arm64, ${RUNNER}"
 fi
 
 if [[ ${OPENSTARBOUND,,} == true ]]; then
-    echolog "🎮 OpenStarbound selected."
-    echolog "🎮 https://github.com/OpenStarbound/OpenStarbound"
+    echo "🎮 OpenStarbound selected."
+    echo "🎮 https://github.com/OpenStarbound/OpenStarbound"
 else
-    echolog "🎮 Official Steam verison selected."
-    echolog "🎮 https://store.steampowered.com/app/211820/Starbound/"
+    echo "🎮 Official Steam verison selected."
+    echo "🎮 https://store.steampowered.com/app/211820/Starbound/"
 fi
 
 # Backup save data on start.
 if [[ ${BACKUP_ENABLED,,} == true ]]; then
-    echolog "💾 Backup enabled."
+    echo "💾 Backup enabled."
     BACKUP_LATEST=$(find /server/backup -type f | grep -E "\/universe_[0-9]{10}.zip$" | sort -r | head -1 | sed -r "s/.*\/universe_([0-9]{10}).zip$/\1/g")
     BACKUP_COOLNESS=$(($(date +%s) - ${BACKUP_LATEST:-0}))
     if [[ $BACKUP_COOLNESS -lt $BACKUP_COOLDOWN ]]; then
-        echolog "  ❌ There are archive(s) younger than $BACKUP_COOLDOWN seconds ($BACKUP_COOLNESS s), skipping backup task."
+        echo "  ❌ There are archive(s) younger than $BACKUP_COOLDOWN seconds ($BACKUP_COOLNESS s), skipping backup task."
     else
         BACKUP_NEWFILE="/server/backup/universe_$(date +%s).zip"
         pushd /server/starbound > /dev/null
-        echolog "  📁 Save file"
-        zip $BACKUP_NEWFILE -9or "./storage" -x "*/starbound_server.log.*" | tee -a $CONTAINER_LOGFILE
+        echo "  📁 Save file"
+        zip $BACKUP_NEWFILE -9or "./storage" -x "*/starbound_server.log.*"
         if [[ ${BACKUP_MODS_MANUAL,,} == true ]]; then
-            echolog "  📁 Manual mods"
-            zip $BACKUP_NEWFILE -9uor "./mods" -i "*.pak" -x "*/workshop-*.pak" | tee -a $CONTAINER_LOGFILE
+            echo "  📁 Manual mods"
+            zip $BACKUP_NEWFILE -9uor "./mods" -i "*.pak" -x "*/workshop-*.pak"
         fi
         if [[ ${BACKUP_MODS_WORKSHOP,,} == true ]]; then
-            echolog "  📁 Workshop mods"
-            zip $BACKUP_NEWFILE -9uor "./mods" -i "*/workshop-*.pak" | tee -a $CONTAINER_LOGFILE
+            echo "  📁 Workshop mods"
+            zip $BACKUP_NEWFILE -9uor "./mods" -i "*/workshop-*.pak"
         fi
         popd > /dev/null
-        echolog "  ✔️ $(du -shb ${BACKUP_NEWFILE})"
-        find /server/backup -type f | grep -E "\/universe_[0-9]{10}.zip$" | sort | head -n -$BACKUP_VERSIONS | xargs -n1 rm -fv | tee -a $CONTAINER_LOGFILE
+        echo "  ✔️ $(du -shb ${BACKUP_NEWFILE})"
+        find /server/backup -type f | grep -E "\/universe_[0-9]{10}.zip$" | sort | head -n -$BACKUP_VERSIONS | xargs -n1 rm -fv
     fi
 else
-    echolog "💾 Backup disabled."
+    echo "💾 Backup disabled."
 fi
 
 # Update SteamCMD on launch if needed.
 STEAM_SCRIPT_BASE="+@NoPromptForPassword 1 +@sSteamCmdForcePlatformType linux +@sSteamCmdForcePlatformBitness 64 +force_install_dir /server/starbound/"
 if [[ ${UPDATE_STEAM,,} == true || ${UPDATE_GAME,,} == true || ${UPDATE_WORKSHOP,,} == true ]]; then
     STEAMCMD_WARMUP
-    find "package" -name "*.zip.*" -delete | tee -a $CONTAINER_LOGFILE
+    find "package" -name "*.zip.*" -delete
 else
-    echolog "🚧 SteamCMD update disabled."
+    echo "🚧 SteamCMD update disabled."
 fi
 
 # Update game data on launch if needed.
 if [[ ${UPDATE_GAME,,} == true ]]; then
-    echolog "🎮 Game update enabled."
+    echo "🎮 Game update enabled."
     UPDATE_GAME_BIN=true
     UPDATE_GAME_PAK_MAIN=true
     UPDATE_GAME_PAK_OPENSB=true
 else
-    echolog "🎮 Game update disabled."
+    echo "🎮 Game update disabled."
     if [[ ${LAUNCH_GAME,,} == true ]]; then
-        echolog "🎮 Checking if game files exist..."
+        echo "🎮 Checking if game files exist..."
         if [[ ${OPENSTARBOUND,,} == true ]]; then
             if [[ -f "/server/starbound/linux/starbound_server" && $(stat -L --printf="%s" "/server/starbound/linux/starbound_server") -gt "40000000" ]]; then
-                echolog "✔️ starbound_server"
+                echo "✔️ starbound_server"
                 [[ ${UPDATE_GAME,,} == true ]] && UPDATE_GAME_BIN=true || UPDATE_GAME_BIN=false
             else
-                echolog "❌ starbound_server"
+                echo "❌ starbound_server"
                 UPDATE_GAME_BIN=true
             fi
             if [[ -f "/server/starbound/assets/opensb.pak" ]]; then
-                echolog "✔️ opensb.pak"
+                echo "✔️ opensb.pak"
                 [[ ${UPDATE_GAME,,} == true ]] && UPDATE_GAME_PAK_OPENSB=true || UPDATE_GAME_PAK_OPENSB=false
             else
-                echolog "❌ opensb.pak"
+                echo "❌ opensb.pak"
                 UPDATE_GAME_PAK_OPENSB=true
             fi
         else
             UPDATE_GAME_PAK_OPENSB=false
             if [[ -f "/server/starbound/linux/starbound_server" && $(stat -L --printf="%s" "/server/starbound/linux/starbound_server") -lt "40000000" ]]; then
-                echolog "✔️ starbound_server"
+                echo "✔️ starbound_server"
                 [[ ${UPDATE_GAME,,} == true ]] && UPDATE_GAME_BIN=true || UPDATE_GAME_BIN=false
             else
-                echolog "❌ starbound_server"
+                echo "❌ starbound_server"
                 UPDATE_GAME_BIN=true
             fi
         fi
         if [[ -f "/server/starbound/assets/packed.pak" ]]; then
-            echolog "✔️ packed.pak"
+            echo "✔️ packed.pak"
             [[ ${UPDATE_GAME,,} == true ]] && UPDATE_GAME_PAK_MAIN=true || UPDATE_GAME_PAK_MAIN=false
         else
-            echolog "❌ packed.pak"
+            echo "❌ packed.pak"
             UPDATE_GAME_PAK_MAIN=true
         fi
     fi
 fi
 
 if [[ ${UPDATE_GAME_BIN,,} == true || ${UPDATE_GAME_PAK_MAIN,,} == true || ${UPDATE_GAME_PAK_OPENSB,,} == true ]]; then
-    echolog "🎮 (Re)installing misssing parts..."
+    echo "🎮 (Re)installing misssing parts..."
     # Need anything from Steam? But skip this part during docker build.
     if [[ ! ${DOCKER_BUILD,,} == true ]]; then
         if [[ ${OPENSTARBOUND,,} == false && ${UPDATE_GAME_BIN,,} == true ]] || [[ ${UPDATE_GAME_PAK_MAIN,,} == true ]]; then
-            echolog "🎮 Downloading files from Steam..."
+            echo "🎮 Downloading files from Steam..."
             # Here we only download the depots we need instead of the whole game, without specifying ManifestID Steam will download the latest available version. As a side effect this also prevents Steam from downloading unneeded runtimes.
             # This is the Linux dedicated server program:
             #   https://steamdb.info/depot/533833/
             # And the packed.pak:
             #   https://steamdb.info/depot/533831/
-            STEAMCMD_RUN $STEAM_SCRIPT_BASE +login $STEAM_LOGIN +download_depot 533830 533833 +download_depot 533830 533831 +quit >> $CONTAINER_LOGFILE
+            STEAMCMD_RUN $STEAM_SCRIPT_BASE +login $STEAM_LOGIN +download_depot 533830 533833 +download_depot 533830 533831 +quit
             if [[ -d "/server/steamcmd/linux64/steamapps/content/app_533830/depot_533831/assets" && -d "/server/steamcmd/linux64/steamapps/content/app_533830/depot_533833/linux" ]]; then
                 # Create the original directory struture so we don't have to modify sbinit.config.
                 if [[ ${UPDATE_GAME_PAK_MAIN,,} == true ]]; then
-                    rm -fv "/server/starbound/assets/packed.pak" | tee -a $CONTAINER_LOGFILE
-                    mv -fv "/server/steamcmd/linux64/steamapps/content/app_533830/depot_533831/assets/packed.pak" "/server/starbound/assets/packed.pak" | tee -a $CONTAINER_LOGFILE
+                    rm -fv "/server/starbound/assets/packed.pak"
+                    mv -fv "/server/steamcmd/linux64/steamapps/content/app_533830/depot_533831/assets/packed.pak" "/server/starbound/assets/packed.pak"
                 fi
                 if [[ ${OPENSTARBOUND,,} == false && ${UPDATE_GAME_BIN,,} == true ]]; then
-                    rm -rfv "/server/starbound/linux" | tee -a $CONTAINER_LOGFILE
-                    mv -fv "/server/steamcmd/linux64/steamapps/content/app_533830/depot_533833/linux" "/server/starbound/linux" | tee -a $CONTAINER_LOGFILE
+                    rm -rfv "/server/starbound/linux"
+                    mv -fv "/server/steamcmd/linux64/steamapps/content/app_533830/depot_533833/linux" "/server/starbound/linux"
                 fi
-                rm -rfv "/server/steamcmd/linux64/steamapps" | tee -a $CONTAINER_LOGFILE
+                rm -rfv "/server/steamcmd/linux64/steamapps"
             else
-                echolog "❌ Failed to download from Steam, abort."
+                echo "❌ Failed to download from Steam, abort."
                 exit 1
             fi
         fi
     fi
     # Need anything from OpenStarbound?
     if [[ ${OPENSTARBOUND,,} == true && ${UPDATE_GAME_BIN,,} == true ]] || [[ ${UPDATE_GAME_PAK_OPENSB,,} == true ]]; then
-        echolog "🎮 Copying OpenStarbond files from image..."
+        echo "🎮 Copying OpenStarbond files from image..."
         # Same as above, create the original directory struture.
         if [[ ${UPDATE_GAME_PAK_OPENSB,,} == true ]]; then
-            cp -fv "/server/openstarbound/assets/opensb.pak" "/server/starbound/assets/opensb.pak" | tee -a $CONTAINER_LOGFILE
+            cp -fv "/server/openstarbound/assets/opensb.pak" "/server/starbound/assets/opensb.pak"
         fi
         if [[ ${OPENSTARBOUND,,} == true && ${UPDATE_GAME_BIN,,} == true ]]; then
-            rm -rfv "/server/starbound/linux" | tee -a $CONTAINER_LOGFILE
-            cp -rfv "/server/openstarbound/linux" "/server/starbound/linux" | tee -a $CONTAINER_LOGFILE
+            rm -rfv "/server/starbound/linux"
+            cp -rfv "/server/openstarbound/linux" "/server/starbound/linux"
         fi
     fi
 fi
@@ -257,7 +256,7 @@ if [[ ${UPDATE_WORKSHOP,,} == true ]]; then
     WORKSHOP_ROOT="/server/starbound"
     WORKSHOP_CONTENT_DIR="${WORKSHOP_ROOT}/steamapps/workshop/content/211820"
 
-    echolog "⚙️ Workshop content update enabled."
+    echo "⚙️ Workshop content update enabled."
 
     # Removes anything non-digit, keep numbers that are 9-10 digits, deduplication and sort, and output a json array.
     WORKSHOP_LIST_TO_ARRAY() {
@@ -276,13 +275,13 @@ if [[ ${UPDATE_WORKSHOP,,} == true ]]; then
 
     WORKSHOP_ITEMS_JSON=$(WORKSHOP_LIST_TO_ARRAY "$WORKSHOP_ITEMS")
     WORKSHOP_ITEMS_COUNT=$(echo "$WORKSHOP_ITEMS_JSON" | jq 'length')
-    echolog "  📖 Items (${WORKSHOP_ITEMS_COUNT}): $(WORKSHOP_ARRAY_TO_LIST "$WORKSHOP_ITEMS_JSON")"
+    echo "  📖 Items (${WORKSHOP_ITEMS_COUNT}): $(WORKSHOP_ARRAY_TO_LIST "$WORKSHOP_ITEMS_JSON")"
 
     WORKSHOP_COLLECTIONS_JSON=$(WORKSHOP_LIST_TO_ARRAY "$WORKSHOP_COLLECTIONS")
     WORKSHOP_COLLECTIONS_COUNT=$(echo "$WORKSHOP_COLLECTIONS_JSON" | jq 'length')
-    echolog "  📖 Collections (${WORKSHOP_COLLECTIONS_COUNT}): $(WORKSHOP_ARRAY_TO_LIST "$WORKSHOP_COLLECTIONS_JSON")"
+    echo "  📖 Collections (${WORKSHOP_COLLECTIONS_COUNT}): $(WORKSHOP_ARRAY_TO_LIST "$WORKSHOP_COLLECTIONS_JSON")"
 
-    echolog "  🔧 Combining all the ids..."
+    echo "  🔧 Combining all the ids..."
     if [[ $WORKSHOP_COLLECTIONS_COUNT -gt 0 ]]; then
         # https://steamapi.xpaw.me/ISteamRemoteStorage#GetCollectionDetails
         WORKSHOP_COLLECTIONS_EXPANDED=$(
@@ -290,7 +289,7 @@ if [[ ${UPDATE_WORKSHOP,,} == true ]]; then
             jq '[.response.collectiondetails[].children[]?.publishedfileid]'
         )
         if [[ -z "$WORKSHOP_COLLECTIONS_EXPANDED" ]]; then
-            echolog "    ❌ Steam API GetCollectionDetails failed, abort."
+            echo "    ❌ Steam API GetCollectionDetails failed, abort."
             exit 1
         fi
     else
@@ -307,7 +306,7 @@ if [[ ${UPDATE_WORKSHOP,,} == true ]]; then
             jq '[.response.publishedfiledetails[] | select(.consumer_app_id == 211820) | {title, publishedfileid, time_updated, file_size}]'
         )
         if [[ -z "$WORKSHOP_FINAL_JSON" ]]; then
-            echolog "    ❌ Steam API GetPublishedFileDetails failed, abort."
+            echo "    ❌ Steam API GetPublishedFileDetails failed, abort."
             exit 1
         fi
     else
@@ -315,9 +314,9 @@ if [[ ${UPDATE_WORKSHOP,,} == true ]]; then
     fi
 
     WORKSHOP_FINAL_COUNT=$(echo "$WORKSHOP_FINAL_JSON" | jq 'length')
-    echolog "      📖 ${WORKSHOP_ITEMS_COUNT} item(s) + ${WORKSHOP_COLLECTIONS_COUNT} collection(s) -> ${WORKSHOP_COMBINED_COUNT} checked -> ${WORKSHOP_FINAL_COUNT} valid."
+    echo "      📖 ${WORKSHOP_ITEMS_COUNT} item(s) + ${WORKSHOP_COLLECTIONS_COUNT} collection(s) -> ${WORKSHOP_COMBINED_COUNT} checked -> ${WORKSHOP_FINAL_COUNT} valid."
 
-    echolog "  🔧 Checking existing workshop content..."
+    echo "  🔧 Checking existing workshop content..."
     if [[ ! -f "/server/data/workshop_data.json" ]]; then
         echo "[]" > "/server/data/workshop_data.json"
     fi
@@ -330,8 +329,8 @@ if [[ ${UPDATE_WORKSHOP,,} == true ]]; then
         ID=${DIR%/}
         ID=${ID##*/}
         if ! echo "$WORKSHOP_CURRENT_IDS" | grep -Fxq -- "$ID"; then
-            echolog "      🗑️ ${ID}: Exists on disk but not in record."
-            rm -rfv "${DIR}" | tee -a $CONTAINER_LOGFILE
+            echo "      🗑️ ${ID}: Exists on disk but not in record."
+            rm -rfv "${DIR}"
             continue
         fi
         RECORDED=$(echo "$WORKSHOP_CURRENT_JSON" | jq --arg ID "$ID" --raw-output '.[] | select(.publishedfileid == $ID) | .file_size // 0')
@@ -340,8 +339,8 @@ if [[ ${UPDATE_WORKSHOP,,} == true ]]; then
             ((SIZE += $(stat -c%s "${PAK}")))
         done
         if [[ "$SIZE" -ne "$RECORDED" ]]; then
-            echolog "      ⚠️ ${ID}: Size mismatch (disk ${SIZE}, record ${RECORDED})."
-            rm -rfv "${DIR}" | tee -a $CONTAINER_LOGFILE
+            echo "      ⚠️ ${ID}: Size mismatch (disk ${SIZE}, record ${RECORDED})."
+            rm -rfv "${DIR}"
             WORKSHOP_CURRENT_MISMATCH+=("${ID}")
         fi
     done
@@ -349,7 +348,7 @@ if [[ ${UPDATE_WORKSHOP,,} == true ]]; then
 
     for ID in $WORKSHOP_CURRENT_IDS; do
         if [[ ! -d "${WORKSHOP_CONTENT_DIR}/${ID}" ]]; then
-            echolog "      ⚠️ ${ID}: Exists in record but not on disk (could be deleted by the size check)."
+            echo "      ⚠️ ${ID}: Exists in record but not on disk (could be deleted by the size check)."
             WORKSHOP_CURRENT_MISMATCH+=("${ID}")
         fi
     done
@@ -375,22 +374,22 @@ if [[ ${UPDATE_WORKSHOP,,} == true ]]; then
     WORKSHOP_DELTA_DELETE_COUNT=$(echo "$WORKSHOP_DELTA_JSON" | jq '.DELETE | length')
     WORKSHOP_DELTA_MODIFY_COUNT=$(echo "$WORKSHOP_DELTA_JSON" | jq '.MODIFY | length')
 
-    echolog "      📖 Changes: ${WORKSHOP_DELTA_NEW_COUNT} new, ${WORKSHOP_DELTA_MODIFY_COUNT} updated, ${WORKSHOP_DELTA_DELETE_COUNT} removed."
+    echo "      📖 Changes: ${WORKSHOP_DELTA_NEW_COUNT} new, ${WORKSHOP_DELTA_MODIFY_COUNT} updated, ${WORKSHOP_DELTA_DELETE_COUNT} removed."
 
     if [[ $WORKSHOP_DELTA_DELETE_COUNT -gt 0 ]]; then
-        echolog "  🔧 Removing ${WORKSHOP_DELTA_DELETE_COUNT} unlisted mod(s)..."
+        echo "  🔧 Removing ${WORKSHOP_DELTA_DELETE_COUNT} unlisted mod(s)..."
         for ID in $(echo "$WORKSHOP_DELTA_JSON" | jq --raw-output '.DELETE[].publishedfileid'); do
-            echolog "      🗑️ ${ID}"
-            rm -rfv "${WORKSHOP_CONTENT_DIR}/${ID}" | tee -a $CONTAINER_LOGFILE
+            echo "      🗑️ ${ID}"
+            rm -rfv "${WORKSHOP_CONTENT_DIR}/${ID}"
         done
     fi
 
     if [[ $WORKSHOP_DELTA_NEW_COUNT -gt 0 || $WORKSHOP_DELTA_MODIFY_COUNT -gt 0 ]]; then
         WORKSHOP_ALL=$(echo "$WORKSHOP_DELTA_JSON" | jq --raw-output '.NEW+.MODIFY | [.[].publishedfileid] | join(",")')
         WORKSHOP_ALL_COUNT=$(echo $WORKSHOP_ALL, | tr -cd "," | wc -c)
-        echolog "  🔧 $WORKSHOP_ALL_COUNT item(s) to download."
-        echolog "    📖 $WORKSHOP_ALL"
-        echolog "  🔧 Currently installed workshop mods: "$(find /server/starbound/steamapps/workshop/content/211820/* -type d | wc -l)
+        echo "  🔧 $WORKSHOP_ALL_COUNT item(s) to download."
+        echo "    📖 $WORKSHOP_ALL"
+        echo "  🔧 Currently installed workshop mods: "$(find /server/starbound/steamapps/workshop/content/211820/* -type d | wc -l)
         LOOP_COUNT=0
         LOOP_TMP_PREVIOUS_START=1
         LOOP_TMP_WORKSHOP_ID=""
@@ -407,21 +406,21 @@ if [[ ${UPDATE_WORKSHOP,,} == true ]]; then
             LOOP_TMP_WORKSHOP_SCRIPT+="+workshop_download_item 211820 $LOOP_TMP_ITEM validate "
             if [[ $(($LOOP_COUNT%$WORKSHOP_CHUNK)) == 0 || $LOOP_COUNT == $WORKSHOP_ALL_COUNT ]]; then
                 LOOP_TMP_WORKSHOP_ID=${LOOP_TMP_WORKSHOP_ID%*,}
-                echolog "  🔧 Downloading mod $LOOP_TMP_PREVIOUS_START to $LOOP_COUNT"
-                echolog "    📖 $LOOP_TMP_WORKSHOP_ID"
+                echo "  🔧 Downloading mod $LOOP_TMP_PREVIOUS_START to $LOOP_COUNT"
+                echo "    📖 $LOOP_TMP_WORKSHOP_ID"
                 # This will loop 1+WORKSHOP_MAX_RETRY times.
                 for ((LOOP_TEMP_WORKSHOP_RETRY = 0 ; LOOP_TEMP_WORKSHOP_RETRY <= WORKSHOP_MAX_RETRY ; LOOP_TEMP_WORKSHOP_RETRY++ )); do
                     rm -f "/server/steamcmd/home/Steam/logs/workshop_log.txt"
-                    STEAMCMD_RUN $STEAM_SCRIPT_BASE +login anonymous $LOOP_TMP_WORKSHOP_SCRIPT +quit >> $CONTAINER_LOGFILE
+                    STEAMCMD_RUN $STEAM_SCRIPT_BASE +login anonymous $LOOP_TMP_WORKSHOP_SCRIPT +quit
                     # Check if this group is downloaded successfully, mark down the unsuccessful ones.
                     LOOP_TEMP_WORKSHOP_SUCCESS=1
                     for LOOP_TMP_WORKSHOP_ID_ITEM in ${LOOP_TMP_WORKSHOP_ID//,/ }; do
                         if grep -swq "Download item $LOOP_TMP_WORKSHOP_ID_ITEM result \: OK" "/server/steamcmd/home/Steam/logs/workshop_log.txt"; then
                             LOOP_TEMP_WORKSHOP_SUCCESS=$(($LOOP_TEMP_WORKSHOP_SUCCESS & 1))
-                            echolog "    ✔️ $LOOP_TMP_WORKSHOP_ID_ITEM"
+                            echo "    ✔️ $LOOP_TMP_WORKSHOP_ID_ITEM"
                         else
                             LOOP_TEMP_WORKSHOP_SUCCESS=$(($LOOP_TEMP_WORKSHOP_SUCCESS & 0))
-                            echolog "    ❌ $LOOP_TMP_WORKSHOP_ID_ITEM"
+                            echo "    ❌ $LOOP_TMP_WORKSHOP_ID_ITEM"
                             LOOP_TMP_WORKSHOP_ID_RETRY+=$LOOP_TMP_WORKSHOP_ID_ITEM","
                             LOOP_TMP_WORKSHOP_SCRIPT_RETRY+="+workshop_download_item 211820 $LOOP_TMP_WORKSHOP_ID_ITEM validate "
                         fi
@@ -431,10 +430,10 @@ if [[ ${UPDATE_WORKSHOP,,} == true ]]; then
                     # Retries exhausted -> Exit container
                     if [[ $LOOP_TEMP_WORKSHOP_SUCCESS == 0 ]]; then
                         if [[ $LOOP_TEMP_WORKSHOP_RETRY == $WORKSHOP_MAX_RETRY ]]; then
-                            echolog "  ❌ Failed to download data, abort."
+                            echo "  ❌ Failed to download data, abort."
                             exit 1
                         else
-                            echolog "  ❌ Download failed, retry $(($LOOP_TEMP_WORKSHOP_RETRY+1))/$WORKSHOP_MAX_RETRY in 30 seconds."
+                            echo "  ❌ Download failed, retry $(($LOOP_TEMP_WORKSHOP_RETRY+1))/$WORKSHOP_MAX_RETRY in 30 seconds."
                             LOOP_TMP_WORKSHOP_ID=${LOOP_TMP_WORKSHOP_ID_RETRY%*,}
                             LOOP_TMP_WORKSHOP_SCRIPT=$LOOP_TMP_WORKSHOP_SCRIPT_RETRY
                             LOOP_TMP_WORKSHOP_ID_RETRY=""
@@ -451,23 +450,26 @@ if [[ ${UPDATE_WORKSHOP,,} == true ]]; then
             fi
         done
     else
-        echolog "  🔧 Nothing to install."
+        echo "  🔧 Nothing to install."
     fi
 
     echo "$WORKSHOP_FINAL_JSON" > "/server/data/workshop_data.json"
 else
-    echolog "⚙️ Workshop content update disabled."
+    echo "⚙️ Workshop content update disabled."
 fi
 
+} > >(tee -a "$CONTAINER_LOGFILE") 2>&1
+
 if [[ ${LAUNCH_GAME,,} == true ]]; then
+    {
     if [[ ${OPENSTARBOUND,,} == false && -f "/server/starbound/assets/opensb.pak" ]]; then
-        echolog "  🔧 Running Steam version but opensb.pak exists."
-        rm -fv "/server/starbound/assets/opensb.pak" | tee -a $CONTAINER_LOGFILE
+        echo "  🔧 Running Steam version but opensb.pak exists."
+        rm -fv "/server/starbound/assets/opensb.pak"
     fi
-    echolog "  🔧 Removing invalid workshop symlinks..."
-    find /server/starbound/mods/workshop-* -xtype l -delete | tee -a $CONTAINER_LOGFILE
+    echo "  🔧 Removing invalid workshop symlinks..."
+    find /server/starbound/mods/workshop-* -xtype l -delete
     if [[ -d "/server/starbound/steamapps/workshop/content/211820" ]]; then
-        echolog "  🔧 Recreating workshop symlinks..."
+        echo "  🔧 Recreating workshop symlinks..."
         # Extract parts from .pak path
         # /server/starbound/steamapps/workshop/content/211820/123456789/foobar.pak
         #                  (\1                                                   )
@@ -478,17 +480,18 @@ if [[ ${LAUNCH_GAME,,} == true ]]; then
         # Create Symlink
         # /server/starbound/mods/workshop-123456789-foobar.pak
         #                                 (\2     ) (\3      )
-        find /server/starbound/steamapps/workshop/content/211820/ -type f -name "*.pak" | sed -r "s/^\/server\/starbound(.*211820\/([0-9]+)\/(.*))$/\"\.\.\1\" \"\/server\/starbound\/mods\/workshop\-\2\-\3\"/" | xargs -n2 ln -vfs | tee -a $CONTAINER_LOGFILE
+        find /server/starbound/steamapps/workshop/content/211820/ -type f -name "*.pak" | sed -r "s/^\/server\/starbound(.*211820\/([0-9]+)\/(.*))$/\"\.\.\1\" \"\/server\/starbound\/mods\/workshop\-\2\-\3\"/" | xargs -n2 ln -vfs
     fi
-    echolog "🎮 Launching Starbound..."
+    echo "🎮 Launching Starbound..."
     cd "/server/starbound/linux"
+    } > >(tee -a "$CONTAINER_LOGFILE") 2>&1
     if [[ ${OPENSTARBOUND,,} == true ]]; then
         exec ./starbound_server
     else
         exec ${RUNNER}starbound_server
     fi
 else
-    echolog "👋 Adios"
+    echo "👋 Adios"
     # Uncomment to keep the container alive for debugging
     #sleep infinity
 fi
