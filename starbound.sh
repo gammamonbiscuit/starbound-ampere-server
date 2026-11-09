@@ -200,7 +200,6 @@ STEAMCMD_RUN() {
 STEAM_SCRIPT_BASE="+@NoPromptForPassword 1 +@sSteamCmdForcePlatformType linux +@sSteamCmdForcePlatformBitness 64 +force_install_dir /server/starbound/"
 if [[ ${UPDATE_STEAM,,} == true || ${UPDATE_GAME,,} == true || ${UPDATE_WORKSHOP,,} == true ]]; then
     STEAMCMD_WARMUP
-    find "package" -name "*.zip.*" -delete
 else
     echo "🚧 SteamCMD update disabled."
 fi
