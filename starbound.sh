@@ -2,7 +2,6 @@
 echo "⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐"
 echo "   Starbound Ampere Server   "
 echo "⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐"
-source ./module.steamcmd.sh
 
 CONTAINER_LOGFILE="/server/data/container.log"
 
@@ -23,6 +22,10 @@ for LOOP_PERMISSION_CHECK in "${PERMISSION_CHECK[@]}"; do
     fi
 done
 
+CONTAINER_ABORT() {
+    echo "❌ ABORT: $*" >&2
+    exit 1
+}
 
 echo "🚧 Logging started" | tee "$CONTAINER_LOGFILE"
 {
@@ -155,6 +158,52 @@ else
     echo "💾 Backup disabled."
 fi
 
+# SteamCMD functions...
+STEAMCMD_INSTALL() {
+    echo "🚧 Installing SteamCMD..."
+    mkdir -m 755 -p "/server/steamcmd" || CONTAINER_ABORT "Unable to create /server/steamcmd"
+    (
+        cd "/server/steamcmd" || exit 1
+        echo "🚧 Installing SteamCMD..."
+        rm -rf linux32 linux64 package public siteserverui steamcmd.sh
+        curl -L -O "https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz" || exit 1
+        tar zxvf "steamcmd_linux.tar.gz" || exit 1
+        rm "steamcmd_linux.tar.gz"
+        STEAMCMD_WARMUP "${1:-}"
+    ) || CONTAINER_ABORT "Unable to install SteamCMD..."
+}
+
+STEAMCMD_WARMUP() {
+    (
+        cd /server/steamcmd || exit 1
+        echo "🚧 Warming up SteamCMD..."
+        if [[ -f "linux64/steamcmd" ]]; then
+            ${RUNNER}linux64/steamcmd +quit >> "$CONTAINER_LOGFILE"
+        else
+            if [[ -f "linux32/steamcmd" ]]; then
+                ${RUNNER}linux32/steamcmd +quit >> "$CONTAINER_LOGFILE"
+                ${RUNNER}linux64/steamcmd +quit >> "$CONTAINER_LOGFILE"
+            else
+                if [[ ! ${1:-} == "boop" ]]; then
+                    STEAMCMD_INSTALL "boop"
+                fi
+            fi
+        fi
+    ) || CONTAINER_ABORT "Unable to warm up SteamCMD..."
+}
+
+STEAMCMD_RUN() {
+    (
+        cd /server/steamcmd || exit 1
+        if [[ -f "linux64/steamcmd" ]]; then
+            ${RUNNER}linux64/steamcmd "$@" >> "$CONTAINER_LOGFILE"
+        else
+            echo "❌ SteamCMD is not installed..."
+            exit 1
+        fi
+    ) || CONTAINER_ABORT "Unable to run SteamCMD..."
+}
+
 # Update SteamCMD on launch if needed.
 STEAM_SCRIPT_BASE="+@NoPromptForPassword 1 +@sSteamCmdForcePlatformType linux +@sSteamCmdForcePlatformBitness 64 +force_install_dir /server/starbound/"
 if [[ ${UPDATE_STEAM,,} == true || ${UPDATE_GAME,,} == true || ${UPDATE_WORKSHOP,,} == true ]]; then
@@ -233,8 +282,7 @@ if [[ ${UPDATE_GAME_BIN,,} == true || ${UPDATE_GAME_PAK_MAIN,,} == true || ${UPD
                 fi
                 rm -rfv "/server/steamcmd/linux64/steamapps"
             else
-                echo "❌ Failed to download from Steam, abort."
-                exit 1
+                CONTAINER_ABORT "Failed to download from Steam."
             fi
         fi
     fi
@@ -289,8 +337,7 @@ if [[ ${UPDATE_WORKSHOP,,} == true ]]; then
             jq '[.response.collectiondetails[].children[]?.publishedfileid]'
         )
         if [[ -z "$WORKSHOP_COLLECTIONS_EXPANDED" ]]; then
-            echo "    ❌ Steam API GetCollectionDetails failed, abort."
-            exit 1
+            CONTAINER_ABORT "Steam API GetCollectionDetails failed."
         fi
     else
         WORKSHOP_COLLECTIONS_EXPANDED="[]"
@@ -306,8 +353,7 @@ if [[ ${UPDATE_WORKSHOP,,} == true ]]; then
             jq '[.response.publishedfiledetails[] | select(.consumer_app_id == 211820) | {title, publishedfileid, time_updated, file_size}]'
         )
         if [[ -z "$WORKSHOP_FINAL_JSON" ]]; then
-            echo "    ❌ Steam API GetPublishedFileDetails failed, abort."
-            exit 1
+            CONTAINER_ABORT "Steam API GetPublishedFileDetails failed."
         fi
     else
         WORKSHOP_FINAL_JSON="[]"
@@ -430,8 +476,7 @@ if [[ ${UPDATE_WORKSHOP,,} == true ]]; then
                     # Retries exhausted -> Exit container
                     if [[ $LOOP_TEMP_WORKSHOP_SUCCESS == 0 ]]; then
                         if [[ $LOOP_TEMP_WORKSHOP_RETRY == $WORKSHOP_MAX_RETRY ]]; then
-                            echo "  ❌ Failed to download data, abort."
-                            exit 1
+                            CONTAINER_ABORT "Failed to download workshop mods after ${WORKSHOP_MAX_RETRY} retries."
                         else
                             echo "  ❌ Download failed, retry $(($LOOP_TEMP_WORKSHOP_RETRY+1))/$WORKSHOP_MAX_RETRY in 30 seconds."
                             LOOP_TMP_WORKSHOP_ID=${LOOP_TMP_WORKSHOP_ID_RETRY%*,}

@@ -170,7 +170,6 @@ COPY --chown=root:root   --chmod=755 --from=builder-box64         /output/box64 
 COPY --chown=steam:steam --chmod=755 --from=builder-osb           /output/openstarbound                /server/openstarbound
 COPY --chown=steam:steam --chmod=755 --from=builder-steam         /output/steamcmd                     /server/steamcmd
 COPY --chown=steam:steam --chmod=755                              starbound.sh                         /server/
-COPY --chown=steam:steam --chmod=755                              module.*.sh                          /server/
 COPY --chown=steam:steam --chmod=755                              data/config/config.env.example       /server/data/starbound.env
 EXPOSE 21025/tcp
 STOPSIGNAL SIGINT
