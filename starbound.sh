@@ -79,10 +79,6 @@ UPDATE_GAME=$UPDATE_GAME
 # Default: false
 UPDATE_WORKSHOP=$UPDATE_WORKSHOP
 
-# Changes UPDATE_WORKSHOP behaviour to verify and download every workshop mods if needed.
-# Default: false
-UPDATE_WORKSHOP_FORCE=$UPDATE_WORKSHOP_FORCE
-
 # A list of Steam workshop ids of individual mods, the id can be obtained from the URL of the item page,
 # the following URL has the id of 1115920474, this is what we needed.
 # https://steamcommunity.com/workshop/filedetails/?id=1115920474
@@ -98,10 +94,6 @@ WORKSHOP_COLLECTIONS=$WORKSHOP_COLLECTIONS
 # Workshop mods are downloaded in groups to avoid downloading a huge list all at once, this option decides the group size, set to 0 to turn off.
 # Default: 20
 WORKSHOP_CHUNK=$WORKSHOP_CHUNK
-
-# Delete workshop mods that are no longer included in WORKSHOP_ITEMS or WORKSHOP_COLLECTIONS.
-# Default: true
-WORKSHOP_PRUNE=$WORKSHOP_PRUNE
 
 # Number of retries should be performed when there are errors downloading mods, container will exit after all retries are exhausted.
 # Default: 3
