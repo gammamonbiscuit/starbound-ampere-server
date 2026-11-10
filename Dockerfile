@@ -8,7 +8,9 @@ ARG TARGETPLATFORM \
     CC=clang \
     CXX=clang++
 
-ENV OPENSTARBOUND_VERSION= \
+ENV DIR_SERVER_ROOT="/server" \
+    DIR_DATA_ROOT="/data" \
+    OPENSTARBOUND_VERSION= \
     OPENSTARBOUND=true \
     STEAM_LOGIN="anonymous" \
     LAUNCH_GAME=true \
@@ -67,13 +69,6 @@ RUN --mount=type=cache,id=$TARGETPLATFORM/var/cache/apt,sharing=locked,target=/v
 RUN mkdir -p /{compile,output/{steamcmd,box64,openstarbound}}
 
 WORKDIR /compile
-
-FROM builder AS builder-steam
-
-RUN cd /output/steamcmd && \
-    curl -L -O "https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz" && \
-    tar zxvf "steamcmd_linux.tar.gz" && \
-    rm "steamcmd_linux.tar.gz"
 
 FROM builder AS builder-box64
 
@@ -155,21 +150,17 @@ RUN cd /output/openstarbound/linux && \
 
 FROM base AS final
 
-RUN mkdir -m 755 -p /{app/{defaults,osb},data/{backup,base_asset,config,custom_server,logs,mods,steam,storage}}
-
-RUN mkdir -m 755 -p /server/{backup,data,steamcmd/home,starbound/{assets,mods,storage,logs,steamapps}} && \
+RUN mkdir -m 755 -p ${DIR_DATA_ROOT}/steam/home ${DIR_SERVER_ROOT}/osb && \
     groupadd -g 1000 steam && \
-    useradd -u 1000 -g steam -d /server/steamcmd/home steam && \
-    chown -R steam:steam /server
+    useradd -u 1000 -g steam -d ${DIR_DATA_ROOT}/steam/home steam && \
+    chown -R steam:steam ${DIR_DATA_ROOT} ${DIR_SERVER_ROOT}
 
 USER steam
-WORKDIR /server
-COPY --chown=root:root   --chmod=755 --from=builder-box64         /output/box64                        /
-COPY --chown=steam:steam --chmod=755 --from=builder-osb           /output/openstarbound                /server/openstarbound
-COPY --chown=steam:steam --chmod=755 --from=builder-steam         /output/steamcmd                     /server/steamcmd
-COPY --chown=steam:steam --chmod=755                              starbound.sh                         /server/
-COPY --chown=steam:steam --chmod=755                              data/config/config.env.example       /server/data/starbound.env
+WORKDIR ${DIR_SERVER_ROOT}
+COPY --chown=root:root   --chmod=755 --from=builder-box64    /output/box64               /
+COPY --chown=steam:steam --chmod=755 --from=builder-osb      /output/openstarbound       ${DIR_SERVER_ROOT}/osb
+COPY --chown=steam:steam --chmod=755                         starbound.sh                ${DIR_SERVER_ROOT}/
 EXPOSE 21025/tcp
 STOPSIGNAL SIGINT
 ENTRYPOINT ["/bin/bash", "-c"]
-CMD ["/server/starbound.sh"]
+CMD ["${DIR_SERVER_ROOT}/starbound.sh"]
