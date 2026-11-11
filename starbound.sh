@@ -540,19 +540,17 @@ if [[ ${LAUNCH_GAME,,} == true ]]; then
     if [[ -d "${DIR_WORKSHOP_CONTENT}" ]]; then
         echo "  🔧 Recreating workshop symlinks..."
         # Extract parts from .pak path
-        # /server/starbound/steamapps/workshop/content/211820/123456789/foobar.pak
-        #                  (\1                                                   )
-        #                                                     (\2     ) (\3      )
-        # Create Relative source path
-        # ../steamapps/workshop/content/211820/123456789/foobar.pak
-        #   (\1                                                   )
-        # Create Symlink
-        # /server/starbound/mods/workshop-123456789-foobar.pak
-        #                                 (\2     ) (\3      )
-        find /server/starbound/steamapps/workshop/content/211820/ -type f -name "*.pak" | sed -r "s/^\/server\/starbound(.*211820\/([0-9]+)\/(.*))$/\"\.\.\1\" \"\/server\/starbound\/mods\/workshop\-\2\-\3\"/" | xargs -n2 ln -vfs
+        # /data/steam/steamapps/workshop/content/211820/123456789/foobar.pak
+        # (\1                                                              )
+        #                                               (\2     ) (\3      )
+        # Use the parts to create the link's path
+        # /data/mods/workshop-123456789-foobar.pak
+        #                     (\2     ) (\3      )
+        # And then just create symlink with ln -r and both full paths, let ln to handle relative paths and have less regex madless lol
+        find "${DIR_WORKSHOP_CONTENT}" -type f -name "*.pak" | sed -r "s#^(.*/211820/([0-9]+)/(.*))\$#\"\1\" \"${DIR_DATA_ROOT}/mods/workshop-\2-\3\"#" | xargs -r -n2 ln -vfsr
     fi
     echo "🎮 Launching Starbound..."
-    cd "/server/starbound/linux"
+    cd "/server/osb/linux"
     } > >(tee -a "$PATH_LOG") 2>&1
     if [[ ${OPENSTARBOUND,,} == true ]]; then
         exec ./starbound_server
