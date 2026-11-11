@@ -15,8 +15,13 @@ PATH_CONFIG_SBINIT="${DIR_DATA_ROOT}/config/sbinit_defaults.config"
 PATH_CONFIG_WS="${DIR_DATA_ROOT}/config/workshop_data.json"
 PATH_LOG="${DIR_DATA_ROOT}/container.log"
 
-echo "🚧 Permission check"
-PERMISSION_CHECK=("${DIR_DATA_ROOT}"
+CONTAINER_ABORT() {
+    echo "❌ ABORT: $*" >&2
+    exit 1
+}
+
+echo "🚧 Preparing data directories..."
+DATA_DIRECTORIES=("${DIR_DATA_ROOT}"
                   "${DIR_DATA_ROOT}/asset"
                   "${DIR_DATA_ROOT}/backup"
                   "${DIR_DATA_ROOT}/config"
@@ -27,27 +32,22 @@ PERMISSION_CHECK=("${DIR_DATA_ROOT}"
                   "${DIR_DATA_ROOT}/storage"
                   "${HOME}"
                  )
-for LOOP_PERMISSION_CHECK in "${PERMISSION_CHECK[@]}"; do
-    if [[ -d $LOOP_PERMISSION_CHECK ]]; then
-        if ! [[ -r $LOOP_PERMISSION_CHECK && -w $LOOP_PERMISSION_CHECK && -x $LOOP_PERMISSION_CHECK ]]; then
-            echo "  ❌ $LOOP_PERMISSION_CHECK is not accessable by $(id -u):$(id -g), paused until this is resolved."
-            until [[ -r $LOOP_PERMISSION_CHECK && -w $LOOP_PERMISSION_CHECK && -x $LOOP_PERMISSION_CHECK ]]; do
-                stat -c "    ❌ Current permission of [$LOOP_PERMISSION_CHECK]: %A(%a) %U(%u) %G(%g)" $LOOP_PERMISSION_CHECK
+for LOOP_DATA_DIRECTORIES in "${DATA_DIRECTORIES[@]}"; do
+    if [[ -d $LOOP_DATA_DIRECTORIES ]]; then
+        if ! [[ -r $LOOP_DATA_DIRECTORIES && -w $LOOP_DATA_DIRECTORIES && -x $LOOP_DATA_DIRECTORIES ]]; then
+            echo "  ❌ $LOOP_DATA_DIRECTORIES is not accessable by $(id -u):$(id -g), paused until this is resolved."
+            until [[ -r $LOOP_DATA_DIRECTORIES && -w $LOOP_DATA_DIRECTORIES && -x $LOOP_DATA_DIRECTORIES ]]; do
+                stat -c "    ❌ Current permission of [$LOOP_DATA_DIRECTORIES]: %A(%a) %U(%u) %G(%g)" $LOOP_DATA_DIRECTORIES
                 sleep 5
             done
         fi
-        echo "  ✔️ $LOOP_PERMISSION_CHECK"
+        echo "  ✔️ $LOOP_DATA_DIRECTORIES"
     else
-        echo "  ✔️ $LOOP_PERMISSION_CHECK (Not exist yet)"
+        mkdir -m 755 -p "${LOOP_DATA_DIRECTORIES}" || CONTAINER_ABORT "Failed to create ${LOOP_DATA_DIRECTORIES}..."
+        echo "  ✔️ $LOOP_DATA_DIRECTORIES (Created)"
     fi
 done
 
-CONTAINER_ABORT() {
-    echo "❌ ABORT: $*" >&2
-    exit 1
-}
-
-mkdir -m 755 -p ${DIR_DATA_ROOT}/{asset,backup,config,mods,steam/{steamcmd,steamapps,home},storage} || CONTAINER_ABORT "Failed to create data directories..."
 echo "🚧 Logging started" | tee "$PATH_LOG"
 {
 if [[ ! -f "${PATH_CONFIG_ENV}" ]]; then
