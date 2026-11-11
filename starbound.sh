@@ -5,7 +5,9 @@ echo "⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐"
 
 DIR_SERVER_ROOT="${DIR_SERVER_ROOT:-/server}"
 DIR_DATA_ROOT="${DIR_DATA_ROOT:-/data}"
-DIR_WORKSHOP_CONTENT="${DIR_DATA_ROOT}/steam/steamapps/workshop/content/211820"
+DIR_STEAMCMD_ROOT="${DIR_DATA_ROOT}/steam/steamcmd"
+DIR_WORKSHOP_ROOT="${DIR_DATA_ROOT}/steam"
+DIR_WORKSHOP_CONTENT="${DIR_WORKSHOP_ROOT}/steamapps/workshop/content/211820"
 HOME="${DIR_DATA_ROOT}/steam/home"
 
 PATH_CONFIG_ENV="${DIR_DATA_ROOT}/config/config.env"
@@ -20,6 +22,8 @@ PERMISSION_CHECK=("${DIR_DATA_ROOT}"
                   "${DIR_DATA_ROOT}/config"
                   "${DIR_DATA_ROOT}/mods"
                   "${DIR_DATA_ROOT}/steam"
+                  "${DIR_DATA_ROOT}/steam/steamapps"
+                  "${DIR_DATA_ROOT}/steam/steamcmd"
                   "${DIR_DATA_ROOT}/storage"
                   "${HOME}"
                  )
@@ -43,7 +47,7 @@ CONTAINER_ABORT() {
     exit 1
 }
 
-mkdir -m 755 -p ${DIR_DATA_ROOT}/{asset,backup,config,mods,steam/home,storage} || CONTAINER_ABORT "Failed to create data directories..."
+mkdir -m 755 -p ${DIR_DATA_ROOT}/{asset,backup,config,mods,steam/{steamcmd,steamapps,home},storage} || CONTAINER_ABORT "Failed to create data directories..."
 echo "🚧 Logging started" | tee "$PATH_LOG"
 {
 if [[ ! -f "${PATH_CONFIG_ENV}" ]]; then
@@ -184,55 +188,52 @@ else
 fi
 
 # SteamCMD functions...
-STEAMCMD_INSTALL() {
-    echo "🚧 Installing SteamCMD..."
-    mkdir -m 755 -p "${DIR_DATA_ROOT}/steam" || CONTAINER_ABORT "Unable to create ${DIR_DATA_ROOT}/steam"
-    (
-        cd "${DIR_DATA_ROOT}/steam" || exit 1
-        echo "🚧 Installing SteamCMD..."
-        rm -rf linux32 linux64 package public siteserverui steamcmd.sh
-        curl -L -O "https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz" || exit 1
-        tar zxvf "steamcmd_linux.tar.gz" || exit 1
-        rm "steamcmd_linux.tar.gz"
-        STEAMCMD_WARMUP "${1:-}"
-    ) || CONTAINER_ABORT "Unable to install SteamCMD..."
-}
-
-STEAMCMD_WARMUP() {
-    (
-        cd "${DIR_DATA_ROOT}/steam" || exit 1
-        echo "🚧 Warming up SteamCMD..."
-        if [[ -f "linux64/steamcmd" ]]; then
-            ${RUNNER}linux64/steamcmd +quit >> "$PATH_LOG"
-        else
-            if [[ -f "linux32/steamcmd" ]]; then
-                ${RUNNER}linux32/steamcmd +quit >> "$PATH_LOG"
-                ${RUNNER}linux64/steamcmd +quit >> "$PATH_LOG"
-            else
-                if [[ ! ${1:-} == "boop" ]]; then
-                    STEAMCMD_INSTALL "boop"
-                fi
-            fi
-        fi
-    ) || CONTAINER_ABORT "Unable to warm up SteamCMD..."
-}
-
 STEAMCMD_RUN() {
     (
-        cd "${DIR_DATA_ROOT}/steam" || exit 1
-        if [[ -f "linux64/steamcmd" ]]; then
-            ${RUNNER}linux64/steamcmd "$@" >> "$PATH_LOG"
-        else
+        cd "${DIR_STEAMCMD_ROOT}" || exit 1
+        if [[ ! -f "linux64/steamcmd" ]]; then
             echo "❌ SteamCMD is not installed..."
             exit 1
         fi
+        for ((RETRY = 1; RETRY <= 5; RETRY++)); do
+            ${RUNNER}linux64/steamcmd "$@" >> "$PATH_LOG"
+            STATUS=$?
+            if [[ ${STATUS} -ne 42 ]]; then
+                exit ${STATUS}
+            fi
+            echo "🚧 SteamCMD requested a restart (${RETRY}/5)..."
+        done
+        echo "❌ SteamCMD kept asking for a restart (exit code 42)."
+        exit 1
     )
 }
 
+STEAMCMD_PREPARE() {
+    (
+        cd "${DIR_STEAMCMD_ROOT}" || exit 1
+        if [[ ! -f "linux64/steamcmd" ]]; then
+            echo "🚧 Installing SteamCMD..."
+            rm -rf linux32 linux64 package public siteserverui steamcmd.sh
+            curl -fL -O "https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz" || exit 1
+            tar zxvf "steamcmd_linux.tar.gz" || exit 1
+            rm "steamcmd_linux.tar.gz"
+            echo "🚧 Bootstrapping SteamCMD..."
+            ${RUNNER}linux32/steamcmd +quit >> "$PATH_LOG"
+            echo "  📖 Exit code: $?"
+            if [[ ! -f "linux64/steamcmd" ]]; then
+                echo "❌ Bootstrapping failed."
+                exit 1
+            fi
+        fi
+        echo "🚧 Warming up SteamCMD..."
+        STEAMCMD_RUN +quit
+    ) || CONTAINER_ABORT "Unable to prepare SteamCMD..."
+}
+
 # Update SteamCMD on launch if needed.
-STEAM_SCRIPT_BASE="+@NoPromptForPassword 1 +@sSteamCmdForcePlatformType linux +@sSteamCmdForcePlatformBitness 64 +force_install_dir ${DIR_DATA_ROOT}/steam/"
+STEAM_SCRIPT_BASE="+@NoPromptForPassword 1 +@sSteamCmdForcePlatformType linux +@sSteamCmdForcePlatformBitness 64 +force_install_dir ${DIR_WORKSHOP_ROOT}"
 if [[ ${UPDATE_STEAM,,} == true || ${UPDATE_GAME,,} == true || ${UPDATE_WORKSHOP,,} == true ]]; then
-    STEAMCMD_WARMUP
+    STEAMCMD_PREPARE
 else
     echo "🚧 SteamCMD update disabled."
 fi
