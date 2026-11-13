@@ -11,7 +11,7 @@ DIR_WORKSHOP_CONTENT="${DIR_WORKSHOP_ROOT}/steamapps/workshop/content/211820"
 HOME="${DIR_DATA_ROOT}/steam/home"
 
 PATH_CONFIG_ENV="${DIR_DATA_ROOT}/config/config.env"
-PATH_CONFIG_SBINIT="${DIR_DATA_ROOT}/config/sbinit_defaults.config"
+PATH_CONFIG_SBINIT="${DIR_DATA_ROOT}/config/sbinit.config"
 PATH_CONFIG_WS="${DIR_DATA_ROOT}/config/workshop_data.json"
 PATH_LOG="${DIR_DATA_ROOT}/container.log"
 
@@ -124,8 +124,8 @@ else
     source "${PATH_CONFIG_ENV}"
 fi
 
-if [[ ! -f "${PATH_CONFIG_SBINIT}" ]]; then
-    echo "🚧 Creating sbinit template file..."
+if ! jq -e . "${PATH_CONFIG_SBINIT}" >> "$PATH_LOG" 2>&1; then
+    echo "🚧 Creating sbinit config file..."
     tee "${PATH_CONFIG_SBINIT}" <<EOF >/dev/null
 {
     "assetDirectories": [],
@@ -140,7 +140,16 @@ if [[ ! -f "${PATH_CONFIG_SBINIT}" ]]; then
     "storageDirectory": ""
 }
 EOF
+else
+    echo "🚧 Updating sbinit config file..."
 fi
+SBINIT_JSON=$(jq --arg O "${DIR_SERVER_ROOT}/osb/assets" \
+                 --arg A "${DIR_DATA_ROOT}/asset" \
+                 --arg M "${DIR_DATA_ROOT}/mods" \
+                 --arg S "${DIR_DATA_ROOT}/storage" \
+                 '.assetDirectories=[$O, $A, $M] | .storageDirectory=$S' \
+                 "${PATH_CONFIG_SBINIT}") || CONTAINER_ABORT "Invalid ${PATH_CONFIG_SBINIT}"
+echo "$SBINIT_JSON" > "${PATH_CONFIG_SBINIT}"
 
 # Decide how to run programs.
 if [[ "$TARGETPLATFORM" == "linux/amd64" ]]; then
@@ -550,12 +559,12 @@ if [[ ${LAUNCH_GAME,,} == true ]]; then
         find "${DIR_WORKSHOP_CONTENT}" -type f -name "*.pak" | sed -r "s#^(.*/211820/([0-9]+)/(.*))\$#\"\1\" \"${DIR_DATA_ROOT}/mods/workshop-\2-\3\"#" | xargs -r -n2 ln -vfsr
     fi
     echo "🎮 Launching Starbound..."
-    cd "/server/osb/linux"
+    cd "${DIR_SERVER_ROOT}/osb/linux"
     } > >(tee -a "$PATH_LOG") 2>&1
     if [[ ${OPENSTARBOUND,,} == true ]]; then
-        exec ./starbound_server
+        exec ./starbound_server -bootconfig "${PATH_CONFIG_SBINIT}"
     else
-        exec ${RUNNER}starbound_server
+        exec ${RUNNER}starbound_server -bootconfig "${PATH_CONFIG_SBINIT}"
     fi
 else
     echo "👋 Adios"
