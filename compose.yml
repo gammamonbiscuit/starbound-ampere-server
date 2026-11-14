@@ -6,8 +6,6 @@ services:
     user: 1000:1000
     ports: [21025:21025/tcp]
     volumes:
-      - ./starbound-mods:/server/starbound/mods
-      - ./starbound-storage:/server/starbound/storage
-      - ./starbound-backup:/server/backup
-      - ./starbound-data:/server/data
+      - ./data:/data
+    stop_grace_period: 1m
     restart: unless-stopped

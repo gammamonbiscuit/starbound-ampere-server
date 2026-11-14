@@ -12,8 +12,7 @@ This is my attempt on running Starbound dedicated server in an Oracle Ampere A1 
 
 ## Features
 1. Multi-arch Starbound dedicated server
-     - Vanilla Starbound in arm64 is emulated by using box64 or FEX-Emu at your choice.
-     - OpenStarbound has native arm64 support, older versions before that are compiled from source.
+     - OpenStarbound `>=0.1.15` has native arm64 support, older versions before that are compiled from source.
      - There are proberly hundreds of projects out there that can do this, if you only want a simple x86 server, theirs might be a better choice.
 2. Use manual mods (`*.pak`)
      - Native feature of Starbound, not much to talk about.
@@ -44,24 +43,15 @@ docker build -t starbound-ampere-server:local .
 ```
 
 >[!NOTE]
->If you are running this in an ARM64 machine, this will take a long time to compile, about half an hour on my 4-core VM.Standard.A1.Flex instance, or 15-20 minutes on Apple M4 depending on how fast I can download FEX-Emu and vcpkg. When building for `linux/amd64` it just downloads OpenStarbound's [release assets](https://github.com/OpenStarbound/OpenStarbound/releases) which should only take a minute or two. OpenStarbound `linux/arm64` build is now available after [commit 9f76581](https://github.com/OpenStarbound/OpenStarbound/commit/9f76581af209e1838e483d1130fd7aaf6cc13dac), the build script now tries to download the arm64 artifacts, if that fails, it falls back to build from source.
+>This will build box64 from source and might take some time. For OpenStarbound, version `0.1.15` and onwards are already native arm64, so unless you want an old version, the script will just download the release build from github. Compile time is about half an hour on my 4-core VM.Standard.A1.Flex instance, or 15-20 minutes on Apple M4 depending on how fast I can download vcpkg.
 
-4. Create server's data directories
+4. Optional: Copy the example configs
 ```bash
-mkdir -p starbound-mods starbound-storage starbound-backup starbound-data
+cp ./data/config/config.env.example ./data/config/config.env
+cp ./data/config/sbinit.config.example ./data/config/sbinit.config
 ```
 
-5. Optional: Copy the example config
-```bash
-cp starbound.env.example ./starbound-data/starbound.env
-```
-
-6. Optional: Edit config with nano (or your preferred editor)
-```bash
-nano ./starbound-data/starbound.env
-```
-
-7. Start the server
+5. Start the server
 ```bash
 docker compose up
 ```
@@ -76,39 +66,45 @@ services:
     user: 1000:1000
     ports: [21025:21025/tcp]
     volumes:
-      - ./starbound-mods:/server/starbound/mods
-      - ./starbound-storage:/server/starbound/storage
-      - ./starbound-backup:/server/backup
-      - ./starbound-data:/server/data
+      - ./data:/data
+    stop_grace_period: 1m
     restart: unless-stopped
 ```
 
-This [compose.yml](/compose.yml) example only mounts some user serviceable paths, but if you have more needs, here's the directory tree inside the container:
+This [compose.yml](/compose.yml) example only mounts the user serviceable `/data`, but if you have more needs, here's the directory tree inside the container:
 
-```
-/server                 # The container's working directory
-|-- backup              # Backup data
-|-- data
-|   |-- container.log   # Log file of the main script
-|   `-- starbound.env   # Environment variables controlling the script’s behaviour
-|-- openstarbound       # Pre-compiled OpenStarbound ARM build
-|-- rootfs              # FEX's rootfs location
-|-- starbound
-|   |-- assets          # Starbound and OpenStarbound's assets
-|   |-- linux           # Game server binaries
-|   |-- logs            # Game logs (OpenStarbound)
-|   |-- mods            # All .pak mods and workshop mod symlinks
-|   |-- steamapps       # Workshop mods' download location
-|   `-- storage         # Save files / game logs (Vanilla Starbound)
-|-- starbound.sh        # Main script
-`-- steamcmd            # SteamCMD binaries
-    `-- home            # The container user's home directory, steamcmd logs are here
+```text
+/data
+├── asset
+│   └── packed.pak                   # Starbound's retail asset
+├── backup              
+│   └── universe_*.zip               # Backup data
+├── config
+│   ├── config.env                   # Container's config file
+│   ├── sbinit.config                # Starbound's config file
+│   └── workshop_data.json           # Workshop mod data, not for edit
+├── mods
+│   ├── *.pak                        # Manual mods
+│   ├── workshop-*-*.pak             # Workshop mod symlinks
+├── steam
+│   ├── home                         # Container user's home
+│   ├── steamapps                    # Actual storage of workshop mods
+│   └── steamcmd                     # SteamCMD binaries
+└── storage
+    ├── logs
+    │   └── starbound_server.log.*   # Rotated logs from provious sessions
+    ├── starbound_server.log         # Live log
+    └── universe                     # Your universe
+
+/server
+|-- osb                              # OpenStarbound binaries
+└── starbound.sh                     # Main script
 ```
 
 ## Steam Guard and packed.pak
 You do not need to disable Steam Guard if you have mobile authenticator enabled. Steam will use an interactive notification in the app to let you proceed with the login request, it might ask you few more questions if you are logging in from an unusual location, for example, a VPS in another country.
 
-With OpenStarbound being the default game engine used in this image, you do not need to login to Steam to download vanilla Starbound, but the `packed.pak` that comes with it is still a problem. To solve this you can use the `packed.pak` from the Starbound copy you own, bind `/server/starbound/assets` to host and put `packed.pak` inside to eliminate the need of Steam login.
+With OpenStarbound being the default game engine used in this image, you do not need to login to Steam to download vanilla Starbound, but the `packed.pak` that comes with it is still a problem. To solve this you can use the `packed.pak` from the Starbound copy you own, put `packed.pak` in `/data/asset` to eliminate the need of Steam login.
 
 It can be found in the following locations, it is recommended to copy from dedicated server, it contains the minimal needed files for server to operate.
 
@@ -120,7 +116,7 @@ The one from client also works.
 
 
 ## Environment Variables
-These variables should be modified in `starbound.env` instead of `compose.yml` because the main script will read them from `starbound.env` at runtime, if you still prefer that you can place an empty `starbound.env` to bypass re-creation.
+These variables should be modified in `config.env` instead of `compose.yml` because the main script will read them from `config.env` at runtime, if you still prefer that you can place an empty `config.env` to bypass re-creation.
 
 | Variable | Default | Example | Info |
 |:----|:----|:----|:----|
