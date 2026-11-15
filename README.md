@@ -56,22 +56,8 @@ cp ./data/config/sbinit.config.example ./data/config/sbinit.config
 docker compose up
 ```
 
-## Docker Compose and directory structure
-```yml
-services:
-  starbound:
-    image: starbound-ampere-server:local
-    pull_policy: never
-    container_name: starbound
-    user: 1000:1000
-    ports: [21025:21025/tcp]
-    volumes:
-      - ./data:/data
-    stop_grace_period: 1m
-    restart: unless-stopped
-```
-
-This [compose.yml](/compose.yml) example only mounts the user serviceable `/data`, but if you have more needs, here's the directory tree inside the container:
+## Directory structure
+The [compose.yml](/compose.yml) example only mounts the user serviceable `/data`, but if you have more needs, here's the directory tree inside the container:
 
 ```text
 /data
@@ -90,14 +76,15 @@ This [compose.yml](/compose.yml) example only mounts the user serviceable `/data
 │   ├── home                         # Container user's home
 │   ├── steamapps                    # Actual storage of workshop mods
 │   └── steamcmd                     # SteamCMD binaries
-└── storage
-    ├── logs
-    │   └── starbound_server.log.*   # Rotated logs from provious sessions
-    ├── starbound_server.log         # Live log
-    └── universe                     # Your universe
+├── storage
+│   ├── logs
+│   │   └── starbound_server.log.*   # Starbound's rotated logs from provious sessions
+│   ├── starbound_server.log         # Starbound's live log
+│   └── universe                     # Your universe
+└── container.log                    # Container's log file
 
 /server
-|-- osb                              # OpenStarbound binaries
+├── osb                              # OpenStarbound binaries
 └── starbound.sh                     # Main script
 ```
 

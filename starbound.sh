@@ -204,13 +204,13 @@ STEAMCMD_RUN() {
             echo "❌ SteamCMD is not installed..."
             exit 1
         fi
-        for ((RETRY = 1; RETRY <= 5; RETRY++)); do
+        for ((STEAMCMD_RETRY = 1; STEAMCMD_RETRY <= 5; STEAMCMD_RETRY++)); do
             ${RUNNER}linux64/steamcmd "$@" >> "$PATH_LOG"
-            STATUS=$?
-            if [[ ${STATUS} -ne 42 ]]; then
-                exit ${STATUS}
+            STEAMCMD_STATUS=$?
+            if [[ ${STEAMCMD_STATUS} -ne 42 ]]; then
+                exit ${STEAMCMD_STATUS}
             fi
-            echo "🚧 SteamCMD requested a restart (${RETRY}/5)..."
+            echo "🚧 SteamCMD requested a restart (${STEAMCMD_RETRY}/5)..."
         done
         echo "❌ SteamCMD kept asking for a restart (exit code 42)."
         exit 1
@@ -226,11 +226,10 @@ STEAMCMD_PREPARE() {
             curl -fL -O "https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz" || exit 1
             tar zxvf "steamcmd_linux.tar.gz" || exit 1
             rm "steamcmd_linux.tar.gz"
-            echo "🚧 Bootstrapping SteamCMD..."
             ${RUNNER}linux32/steamcmd +quit >> "$PATH_LOG"
             echo "  📖 Exit code: $?"
             if [[ ! -f "linux64/steamcmd" ]]; then
-                echo "❌ Bootstrapping failed."
+                echo "❌ Installation failed."
                 exit 1
             fi
         fi
