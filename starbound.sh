@@ -53,16 +53,12 @@ echo "🚧 Logging started" | tee "$PATH_LOG"
 if [[ ! -f "${PATH_CONFIG_ENV}" ]]; then
     echo "🚧 Creating config file..."
     tee "${PATH_CONFIG_ENV}" <<EOF >/dev/null
-# Your Steam credentials, required to download the game, workshop mods are always downloaded anonymously.
+# Your Steam credentials, required to download retail asset, workshop mods are always downloaded anonymously.
 # Default: "anonymous"
 # Example: "myusername mypassword"
 STEAM_LOGIN="$STEAM_LOGIN"
 
-# Use OpenStarbound instead of the original binaries, however you still have to login to Steam to download the assets.
-# Default: true
-OPENSTARBOUND=$OPENSTARBOUND
-
-# Starbound will be launched after all update operations (if any) are finished.
+# Starbound will be launched after all update operations (if any) are finished. If packed.pak is missing, this script will not launch the game.
 # Default: true
 LAUNCH_GAME=$LAUNCH_GAME
 
@@ -86,13 +82,13 @@ BACKUP_MODS_MANUAL=$BACKUP_MODS_MANUAL
 # Default: false
 BACKUP_MODS_WORKSHOP=$BACKUP_MODS_WORKSHOP
 
-# Decides whether to update SteamCMD or not, if UPDATE_GAME or UPDATE_WORKSHOP is set to true this option will be ignored.
+# Decides whether to update SteamCMD or not, if UPDATE_RETAIL_ASSET or UPDATE_WORKSHOP is set to true this option will be ignored.
 # Default: false
 UPDATE_STEAM=$UPDATE_STEAM
 
-# Decides whether to update all game files or not, if LAUNCH_GAME is set to true and the game is incomplete, this script will still re-download the missing parts.
+# Decides whether to download retail asset or not, need to set STEAM_LOGIN for this. Only need to run once to get the file.
 # Default: false
-UPDATE_GAME=$UPDATE_GAME
+UPDATE_RETAIL_ASSET=$UPDATE_RETAIL_ASSET
 
 # Decides whether to update workshop mods or not, whilst skipping already installed mods.
 # Default: false
@@ -160,14 +156,6 @@ else
     echo "🚧 arm64, ${RUNNER}"
 fi
 
-if [[ ${OPENSTARBOUND,,} == true ]]; then
-    echo "🎮 OpenStarbound selected."
-    echo "🎮 https://github.com/OpenStarbound/OpenStarbound"
-else
-    echo "🎮 Official Steam verison selected."
-    echo "🎮 https://store.steampowered.com/app/211820/Starbound/"
-fi
-
 # Backup save data on start.
 if [[ ${BACKUP_ENABLED,,} == true ]]; then
     echo "💾 Backup enabled."
@@ -197,6 +185,7 @@ else
 fi
 
 # SteamCMD functions...
+STEAMCMD_VERBOSE=false
 STEAMCMD_RUN() {
     (
         cd "${DIR_STEAMCMD_ROOT}" || exit 1
@@ -205,7 +194,11 @@ STEAMCMD_RUN() {
             exit 1
         fi
         for ((STEAMCMD_RETRY = 1; STEAMCMD_RETRY <= 5; STEAMCMD_RETRY++)); do
-            ${RUNNER}linux64/steamcmd "$@" >> "$PATH_LOG"
+            if [[ ${STEAMCMD_VERBOSE,,} == true ]]; then
+                ${RUNNER}linux64/steamcmd "$@"
+            else
+                ${RUNNER}linux64/steamcmd "$@" >> "$PATH_LOG"
+            fi
             STEAMCMD_STATUS=$?
             if [[ ${STEAMCMD_STATUS} -ne 42 ]]; then
                 exit ${STEAMCMD_STATUS}
@@ -240,100 +233,42 @@ STEAMCMD_PREPARE() {
 
 # Update SteamCMD on launch if needed.
 STEAM_SCRIPT_BASE="+@NoPromptForPassword 1 +@sSteamCmdForcePlatformType linux +@sSteamCmdForcePlatformBitness 64 +force_install_dir ${DIR_WORKSHOP_ROOT}"
-if [[ ${UPDATE_STEAM,,} == true || ${UPDATE_GAME,,} == true || ${UPDATE_WORKSHOP,,} == true ]]; then
+if [[ ${UPDATE_STEAM,,} == true || ${UPDATE_RETAIL_ASSET,,} == true || ${UPDATE_WORKSHOP,,} == true ]]; then
     STEAMCMD_PREPARE
 else
     echo "🚧 SteamCMD update disabled."
 fi
 
-# Disabled these for now, most of the UPDATE_GAME_* parts need rework
+# Download the reatil packed.pak
+# Pinned asset manifest 2755498507246012069
+# sha256 fd2daa44332fa1b834ec6b52bdbf027235c4dcb8560aac9d265f7ab6d6d462fb
+# https://steamdb.info/depot/533831/
+if [[ ${UPDATE_RETAIL_ASSET,,} == true ]]; then
+    echo "🚧 Downloading Starbound asset..."
+    PATH_RETAIL_ASSET="${DIR_DATA_ROOT}/steam/steamcmd/linux64/steamapps/content/app_533830/depot_533831/assets/packed.pak"
+    HASH_RETAIL_ASSET="fd2daa44332fa1b834ec6b52bdbf027235c4dcb8560aac9d265f7ab6d6d462fb"
+    if [[ -f "${DIR_DATA_ROOT}/asset/packed.pak" ]] && echo "${HASH_RETAIL_ASSET} ${DIR_DATA_ROOT}/asset/packed.pak" | sha256sum --check --status; then
+        echo "  ✔️ packed.pak already matches the pinned manifest."
+    else
+        STEAMCMD_VERBOSE=true
+        STEAMCMD_RUN +login $STEAM_LOGIN +download_depot 533830 533831 2755498507246012069 +quit
+        STEAMCMD_VERBOSE=false
+        if echo "${HASH_RETAIL_ASSET} ${PATH_RETAIL_ASSET}" | sha256sum --check --status; then
+            cp -fv "${PATH_RETAIL_ASSET}" "${DIR_DATA_ROOT}/asset/packed.pak"
+            echo "  ✔️ Download finished."
+        else
+            echo "  ❌ Hash mismatch: $(sha256sum "${PATH_RETAIL_ASSET}")"
+            echo "  ❌ Expect ${HASH_RETAIL_ASSET}"
+            CONTAINER_ABORT "Unable to download Starbound asset..."
+        fi
+    fi
+fi
 
-# Update game data on launch if needed.
-# if [[ ${UPDATE_GAME,,} == true ]]; then
-#     echo "🎮 Game update enabled."
-#     UPDATE_GAME_BIN=true
-#     UPDATE_GAME_PAK_MAIN=true
-#     UPDATE_GAME_PAK_OPENSB=true
-# else
-#     echo "🎮 Game update disabled."
-#     if [[ ${LAUNCH_GAME,,} == true ]]; then
-#         echo "🎮 Checking if game files exist..."
-#         if [[ ${OPENSTARBOUND,,} == true ]]; then
-#             if [[ -f "/server/starbound/linux/starbound_server" && $(stat -L --printf="%s" "/server/starbound/linux/starbound_server") -gt "40000000" ]]; then
-#                 echo "✔️ starbound_server"
-#                 [[ ${UPDATE_GAME,,} == true ]] && UPDATE_GAME_BIN=true || UPDATE_GAME_BIN=false
-#             else
-#                 echo "❌ starbound_server"
-#                 UPDATE_GAME_BIN=true
-#             fi
-#             if [[ -f "/server/starbound/assets/opensb.pak" ]]; then
-#                 echo "✔️ opensb.pak"
-#                 [[ ${UPDATE_GAME,,} == true ]] && UPDATE_GAME_PAK_OPENSB=true || UPDATE_GAME_PAK_OPENSB=false
-#             else
-#                 echo "❌ opensb.pak"
-#                 UPDATE_GAME_PAK_OPENSB=true
-#             fi
-#         else
-#             UPDATE_GAME_PAK_OPENSB=false
-#             if [[ -f "/server/starbound/linux/starbound_server" && $(stat -L --printf="%s" "/server/starbound/linux/starbound_server") -lt "40000000" ]]; then
-#                 echo "✔️ starbound_server"
-#                 [[ ${UPDATE_GAME,,} == true ]] && UPDATE_GAME_BIN=true || UPDATE_GAME_BIN=false
-#             else
-#                 echo "❌ starbound_server"
-#                 UPDATE_GAME_BIN=true
-#             fi
-#         fi
-#         if [[ -f "/server/starbound/assets/packed.pak" ]]; then
-#             echo "✔️ packed.pak"
-#             [[ ${UPDATE_GAME,,} == true ]] && UPDATE_GAME_PAK_MAIN=true || UPDATE_GAME_PAK_MAIN=false
-#         else
-#             echo "❌ packed.pak"
-#             UPDATE_GAME_PAK_MAIN=true
-#         fi
-#     fi
-# fi
-
-# if [[ ${UPDATE_GAME_BIN,,} == true || ${UPDATE_GAME_PAK_MAIN,,} == true || ${UPDATE_GAME_PAK_OPENSB,,} == true ]]; then
-#     echo "🎮 (Re)installing misssing parts..."
-#     # Need anything from Steam? But skip this part during docker build.
-#     if [[ ! ${DOCKER_BUILD,,} == true ]]; then
-#         if [[ ${OPENSTARBOUND,,} == false && ${UPDATE_GAME_BIN,,} == true ]] || [[ ${UPDATE_GAME_PAK_MAIN,,} == true ]]; then
-#             echo "🎮 Downloading files from Steam..."
-#             # Here we only download the depots we need instead of the whole game, without specifying ManifestID Steam will download the latest available version. As a side effect this also prevents Steam from downloading unneeded runtimes.
-#             # This is the Linux dedicated server program:
-#             #   https://steamdb.info/depot/533833/
-#             # And the packed.pak:
-#             #   https://steamdb.info/depot/533831/
-#             STEAMCMD_RUN $STEAM_SCRIPT_BASE +login $STEAM_LOGIN +download_depot 533830 533833 +download_depot 533830 533831 +quit
-#             if [[ -d "/server/steamcmd/linux64/steamapps/content/app_533830/depot_533831/assets" && -d "/server/steamcmd/linux64/steamapps/content/app_533830/depot_533833/linux" ]]; then
-#                 # Create the original directory struture so we don't have to modify sbinit.config.
-#                 if [[ ${UPDATE_GAME_PAK_MAIN,,} == true ]]; then
-#                     rm -fv "/server/starbound/assets/packed.pak"
-#                     mv -fv "/server/steamcmd/linux64/steamapps/content/app_533830/depot_533831/assets/packed.pak" "/server/starbound/assets/packed.pak"
-#                 fi
-#                 if [[ ${OPENSTARBOUND,,} == false && ${UPDATE_GAME_BIN,,} == true ]]; then
-#                     rm -rfv "/server/starbound/linux"
-#                     mv -fv "/server/steamcmd/linux64/steamapps/content/app_533830/depot_533833/linux" "/server/starbound/linux"
-#                 fi
-#                 rm -rfv "/server/steamcmd/linux64/steamapps"
-#             else
-#                 CONTAINER_ABORT "Failed to download from Steam."
-#             fi
-#         fi
-#     fi
-#     # Need anything from OpenStarbound?
-#     if [[ ${OPENSTARBOUND,,} == true && ${UPDATE_GAME_BIN,,} == true ]] || [[ ${UPDATE_GAME_PAK_OPENSB,,} == true ]]; then
-#         echo "🎮 Copying OpenStarbond files from image..."
-#         # Same as above, create the original directory struture.
-#         if [[ ${UPDATE_GAME_PAK_OPENSB,,} == true ]]; then
-#             cp -fv "/server/openstarbound/assets/opensb.pak" "/server/starbound/assets/opensb.pak"
-#         fi
-#         if [[ ${OPENSTARBOUND,,} == true && ${UPDATE_GAME_BIN,,} == true ]]; then
-#             rm -rfv "/server/starbound/linux"
-#             cp -rfv "/server/openstarbound/linux" "/server/starbound/linux"
-#         fi
-#     fi
-# fi
+if [[ ${LAUNCH_GAME,,} == true && ! -f "${DIR_DATA_ROOT}/asset/packed.pak" ]]; then
+    LAUNCH_GAME=false
+    echo "❌ packed.pak is missing from ${DIR_DATA_ROOT}/asset, fallback to setup-only mode (LAUNCH_GAME=false)."
+    sleep 15
+fi
 
 if [[ ${UPDATE_WORKSHOP,,} == true ]]; then
     echo "⚙️ Workshop content update enabled."
@@ -539,10 +474,6 @@ fi
 
 if [[ ${LAUNCH_GAME,,} == true ]]; then
     {
-    # if [[ ${OPENSTARBOUND,,} == false && -f "/server/starbound/assets/opensb.pak" ]]; then
-    #     echo "  🔧 Running Steam version but opensb.pak exists."
-    #     rm -fv "/server/starbound/assets/opensb.pak"
-    # fi
     echo "  🔧 Removing old symlinks..."
     find ${DIR_DATA_ROOT}/mods/workshop-* -xtype l -delete
     if [[ -d "${DIR_WORKSHOP_CONTENT}" ]]; then
@@ -558,13 +489,8 @@ if [[ ${LAUNCH_GAME,,} == true ]]; then
         find "${DIR_WORKSHOP_CONTENT}" -type f -name "*.pak" | sed -r "s#^(.*/211820/([0-9]+)/(.*))\$#\"\1\" \"${DIR_DATA_ROOT}/mods/workshop-\2-\3\"#" | xargs -r -n2 ln -vfsr
     fi
     echo "🎮 Launching Starbound..."
-    cd "${DIR_SERVER_ROOT}/osb/linux"
     } > >(tee -a "$PATH_LOG") 2>&1
-    if [[ ${OPENSTARBOUND,,} == true ]]; then
-        exec ./starbound_server -bootconfig "${PATH_CONFIG_SBINIT}"
-    else
-        exec ${RUNNER}starbound_server -bootconfig "${PATH_CONFIG_SBINIT}"
-    fi
+    exec "${DIR_SERVER_ROOT}/osb/linux/starbound_server" -bootconfig "${PATH_CONFIG_SBINIT}"
 else
     echo "👋 Adios"
     # Uncomment to keep the container alive for debugging

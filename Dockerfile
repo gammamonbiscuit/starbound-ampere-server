@@ -11,7 +11,6 @@ ARG TARGETPLATFORM \
 ENV DIR_SERVER_ROOT="/server" \
     DIR_DATA_ROOT="/data" \
     OPENSTARBOUND_VERSION= \
-    OPENSTARBOUND=true \
     STEAM_LOGIN="anonymous" \
     LAUNCH_GAME=true \
     BACKUP_ENABLED=true \
@@ -20,7 +19,7 @@ ENV DIR_SERVER_ROOT="/server" \
     BACKUP_MODS_MANUAL=false \
     BACKUP_MODS_WORKSHOP=false \
     UPDATE_STEAM=false \
-    UPDATE_GAME=false \
+    UPDATE_RETAIL_ASSET=false \
     UPDATE_WORKSHOP=false \
     WORKSHOP_ITEMS="" \
     WORKSHOP_COLLECTIONS="" \

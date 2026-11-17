@@ -51,7 +51,10 @@ cp ./data/config/config.env.example ./data/config/config.env
 cp ./data/config/sbinit.config.example ./data/config/sbinit.config
 ```
 
-5. Start the server
+5. Get your packed.pak
+<br />Check the [Steam Guard and packed.pak](#steam-guard-and-packedpak) section.
+
+6. Start the server
 ```bash
 docker compose up
 ```
@@ -89,8 +92,7 @@ The [compose.yml](/compose.yml) example only mounts the user serviceable `/data`
 ```
 
 ## Steam Guard and packed.pak
-You do not need to disable Steam Guard if you have mobile authenticator enabled. Steam will use an interactive notification in the app to let you proceed with the login request, it might ask you few more questions if you are logging in from an unusual location, for example, a VPS in another country.
-
+### Manual setup (recommended)
 With OpenStarbound being the default game engine used in this image, you do not need to login to Steam to download vanilla Starbound, but the `packed.pak` that comes with it is still a problem. To solve this you can use the `packed.pak` from the Starbound copy you own, put `packed.pak` in `/data/asset` to eliminate the need of Steam login.
 
 It can be found in the following locations, it is recommended to copy from dedicated server, it contains the minimal needed files for server to operate.
@@ -101,22 +103,25 @@ The one from client also works.
 
 `[Steam Root]/steamapps/common/Starbound/assets/packed.pak`
 
+### Let the script handle it
+To do this, you need a Steam account that owns Starbound. In config, set `STEAM_LOGIN` to your Steam credentials and `UPDATE_RETAIL_ASSET` to `true`, then the script will download the file from Steam and place it in `/data/asset`. You only need to do it once, set `UPDATE_RETAIL_ASSET` back to `false` after it is done.
+
+You do not need to disable Steam Guard if you have mobile authenticator enabled. Steam will use an interactive notification in the app to let you proceed with the login request, it might ask you few more questions if you are logging in from an unusual location, for example, a VPS in another country.
 
 ## Environment Variables
 These variables should be modified in `config.env` instead of `compose.yml` because the main script will read them from `config.env` at runtime, if you still prefer that you can place an empty `config.env` to bypass re-creation.
 
 | Variable | Default | Example | Info |
 |:----|:----|:----|:----|
-| `STEAM_LOGIN`           | `"anonymous"` | `"myusername mypassword"` | Your Steam credentials, required to download the game, workshop mods are always downloaded anonymously.                                                               |
-| `OPENSTARBOUND`         | `true`        | `false`                   | To use OpenStarbound instead of vanilla Starbound, however you still have to use Steam to download (or provide your own copy of) `packed.pak` .                       |
-| `LAUNCH_GAME`           | `true`        | `false`                   | Starbound will be launched after all update operations (if any) are finished.                                                                                         |
+| `STEAM_LOGIN`           | `"anonymous"` | `"myusername mypassword"` | Your Steam credentials, required to download retail asset, workshop mods are always downloaded anonymously.                                                           |
+| `LAUNCH_GAME`           | `true`        | `false`                   | Starbound will be launched after all update operations (if any) are finished. If packed.pak is missing, this script will not launch the game.                         |
 | `BACKUP_ENABLED`        | `true`        | `false`                   | Backup save data on start, before any update and game launch.                                                                                                         |
 | `BACKUP_VERSIONS`       | `10`          | `5`                       | Decides how many copies of backup data will be kept.                                                                                                                  |
 | `BACKUP_COOLDOWN`       | `1800`        | `3600`                    | Number of seconds that must be passed before a backup task can run again, this is to prevent backups being overwritten by broken repeatedly restarting container.     |
 | `BACKUP_MODS_MANUAL`    | `false`       | `true`                    | Include manual mods in backup.                                                                                                                                        |
 | `BACKUP_MODS_WORKSHOP`  | `false`       | `true`                    | Include workshop mods in backup.                                                                                                                                      |
-| `UPDATE_STEAM`          | `false`       | `true`                    | Decides whether to update SteamCMD or not, if `UPDATE_GAME` or `UPDATE_WORKSHOP` is set to true this option will be ignored.                                          |
-| `UPDATE_GAME`           | `false`       | `true`                    | Decides whether to update all game files or not, if `LAUNCH_GAME` is set to `true` and the game is incomplete, this script will still re-download the missing parts.  |
+| `UPDATE_STEAM`          | `false`       | `true`                    | Decides whether to update SteamCMD or not, if `UPDATE_RETAIL_ASSET` or `UPDATE_WORKSHOP` is set to true this option will be ignored.                                  |
+| `UPDATE_RETAIL_ASSET`   | `false`       | `true`                    | Decides whether to download retail asset or not, need to set STEAM_LOGIN for this. Only need to run once to get the file.                                             |
 | `UPDATE_WORKSHOP`       | `false`       | `true`                    | Decides whether to update workshop mods or not, whilst skipping already installed mods.                                                                               |
 | `WORKSHOP_ITEMS`        |               | `1115920474,729427436`    | A list of Steam workshop ids of individual mods, the id can be obtained from the URL of the item page.                                                                |
 | `WORKSHOP_COLLECTIONS`  |               | `3468099241`              | A list of Steam workshop ids, but only for collections.                                                                                                               |

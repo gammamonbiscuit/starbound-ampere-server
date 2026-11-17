@@ -1,7 +1,8 @@
 ## packed.pak
 Here is the place where you should put Starbound's packed.pak, this is required for the server to function.
 - Either the one from client or server is fine, you only need one, do not install both.
-- The file size and SHA256 hashes below are only for reference, the script does not check for it.
+- The file size and SHA256 hashes below are only for reference if you decide to bring your own, the script does not check the supplied file.
+- If you use `UPDATE_RETAIL_ASSET` to let the script handle it, it will overwrite the existing file with the server version stated below.
 - I can't stop you from putting mods here, but this directory is not included in backup.
 
 ```
