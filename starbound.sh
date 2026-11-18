@@ -330,7 +330,7 @@ if [[ ${UPDATE_WORKSHOP,,} == true ]]; then
     echo "      📖 ${WORKSHOP_ITEMS_COUNT} item(s) + ${WORKSHOP_COLLECTIONS_COUNT} collection(s) -> ${WORKSHOP_COMBINED_COUNT} checked -> ${WORKSHOP_FINAL_COUNT} valid."
 
     echo "  🔧 Checking existing workshop content..."
-    if [[ ! -f "${PATH_CONFIG_WS}" ]]; then
+    if [[ ! -f "${PATH_CONFIG_WS}" ]] || ! jq -e 'type == "array"' "${PATH_CONFIG_WS}" >> "$PATH_LOG" 2>&1; then
         echo "[]" > "${PATH_CONFIG_WS}"
     fi
     WORKSHOP_CURRENT_JSON=$(<"${PATH_CONFIG_WS}")
