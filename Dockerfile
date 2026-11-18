@@ -64,7 +64,7 @@ WORKDIR /compile
 FROM builder AS builder-box64
 
 RUN if [[ "$TARGETPLATFORM" == "linux/arm64" ]]; then \
-        git clone --depth 1 --branch $(git ls-remote --tags https://github.com/ptitSeb/box64.git | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+$' | tail -1) https://github.com/ptitSeb/box64.git && \
+        git clone --depth 1 --branch $(git ls-remote --tags https://github.com/ptitSeb/box64.git | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1) https://github.com/ptitSeb/box64.git && \
         cd /compile/box64 && \
         cmake . -D ADLINK=1 -D ARM_DYNAREC=ON -D BOX32=ON -D BOX32_BINFMT=ON -D CMAKE_BUILD_TYPE=Release && \
         make -j$(nproc) && \
