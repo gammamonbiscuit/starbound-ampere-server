@@ -1,4 +1,4 @@
-FROM scratch AS env
+FROM debian:trixie-slim AS base
 
 ARG TARGETPLATFORM \
     DEBIAN_FRONTEND=noninteractive \
@@ -37,16 +37,9 @@ ENV DIR_SERVER_ROOT="/server" \
 
 SHELL ["/bin/bash", "-c"]
 
-FROM debian:trixie-slim AS os
-
-FROM env AS base
-
-COPY --from=os / /
-
 RUN --mount=type=cache,id=$TARGETPLATFORM/var/cache/apt,sharing=locked,target=/var/cache/apt \
     --mount=type=cache,id=$TARGETPLATFORM/var/lib/apt,sharing=locked,target=/var/lib/apt \
     --mount=type=cache,id=$TARGETPLATFORM/var/cache/debconf,sharing=locked,target=/var/cache/debconf \
-    --mount=type=cache,id=$TARGETPLATFORM/etc/apt/apt.conf.d,sharing=locked,from=os,source=/etc/apt/apt.conf.d,target=/etc/apt/apt.conf.d \
     if [[ ${APT_CACHE,,} == true ]]; then \
         echo "Acquire::http::Proxy \"http://${APT_CACHE_PROXY}\";" >> /etc/apt/apt.conf.d/01proxy && \
         echo "Acquire::https::Proxy \"DIRECT\";" >> /etc/apt/apt.conf.d/01proxy; \
@@ -59,7 +52,6 @@ FROM base AS builder
 RUN --mount=type=cache,id=$TARGETPLATFORM/var/cache/apt,sharing=locked,target=/var/cache/apt \
     --mount=type=cache,id=$TARGETPLATFORM/var/lib/apt,sharing=locked,target=/var/lib/apt \
     --mount=type=cache,id=$TARGETPLATFORM/var/cache/debconf,sharing=locked,target=/var/cache/debconf \
-    --mount=type=cache,id=$TARGETPLATFORM/etc/apt/apt.conf.d,sharing=locked,from=os,source=/etc/apt/apt.conf.d,target=/etc/apt/apt.conf.d \
     apt install -y binutils && \
     if [[ "$TARGETPLATFORM" == "linux/arm64" ]]; then \
         apt install -y build-essential cmake clang pkg-config libxmu-dev libgl-dev libglu1-mesa-dev libsdl2-dev python3-jinja2 ninja-build autoconf automake autoconf-archive libltdl-dev libtool libasound2-dev libpulse-dev libaudio-dev libfribidi-dev libjack-dev libsndio-dev libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev libxss-dev libxtst-dev libxkbcommon-dev libdrm-dev libgbm-dev libgl1-mesa-dev libgles2-mesa-dev libegl1-mesa-dev libdbus-1-dev libibus-1.0-dev libudev-dev libthai-dev libusb-1.0-0-dev libpipewire-0.3-dev libwayland-dev libdecor-0-dev liburing-dev; \
