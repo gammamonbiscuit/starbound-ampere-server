@@ -82,10 +82,6 @@ BACKUP_MODS_MANUAL=$BACKUP_MODS_MANUAL
 # Default: false
 BACKUP_MODS_WORKSHOP=$BACKUP_MODS_WORKSHOP
 
-# Decides whether to update SteamCMD or not, if UPDATE_RETAIL_ASSET or UPDATE_WORKSHOP is set to true this option will be ignored.
-# Default: false
-UPDATE_STEAM=$UPDATE_STEAM
-
 # Decides whether to download retail asset or not, need to set STEAM_LOGIN for this. Only need to run once to get the file.
 # Default: false
 UPDATE_RETAIL_ASSET=$UPDATE_RETAIL_ASSET
@@ -231,14 +227,6 @@ STEAMCMD_PREPARE() {
     ) || CONTAINER_ABORT "Unable to prepare SteamCMD..."
 }
 
-# Update SteamCMD on launch if needed.
-STEAM_SCRIPT_BASE="+@NoPromptForPassword 1 +@sSteamCmdForcePlatformType linux +@sSteamCmdForcePlatformBitness 64 +force_install_dir ${DIR_WORKSHOP_ROOT}"
-if [[ ${UPDATE_STEAM,,} == true || ${UPDATE_RETAIL_ASSET,,} == true || ${UPDATE_WORKSHOP,,} == true ]]; then
-    STEAMCMD_PREPARE
-else
-    echo "🚧 SteamCMD update disabled."
-fi
-
 # Download the reatil packed.pak
 # Pinned asset manifest 2755498507246012069
 # sha256 fd2daa44332fa1b834ec6b52bdbf027235c4dcb8560aac9d265f7ab6d6d462fb
@@ -250,6 +238,7 @@ if [[ ${UPDATE_RETAIL_ASSET,,} == true ]]; then
     if [[ -f "${DIR_DATA_ROOT}/asset/packed.pak" ]] && echo "${HASH_RETAIL_ASSET} ${DIR_DATA_ROOT}/asset/packed.pak" | sha256sum --check --status; then
         echo "  ✔️ packed.pak already matches the pinned manifest."
     else
+        STEAMCMD_PREPARE
         STEAMCMD_VERBOSE=true
         STEAMCMD_RUN +login $STEAM_LOGIN +download_depot 533830 533831 2755498507246012069 +quit
         STEAMCMD_VERBOSE=false
@@ -272,6 +261,7 @@ fi
 
 if [[ ${UPDATE_WORKSHOP,,} == true ]]; then
     echo "⚙️ Workshop content update enabled."
+    WORKSHOP_SCRIPT_BASE="+@NoPromptForPassword 1 +@sSteamCmdForcePlatformType linux +@sSteamCmdForcePlatformBitness 64 +force_install_dir ${DIR_WORKSHOP_ROOT}"
 
     # Removes anything non-digit, keep numbers that are 9-10 digits, deduplication and sort, and output a json array.
     WORKSHOP_LIST_TO_ARRAY() {
@@ -398,6 +388,7 @@ if [[ ${UPDATE_WORKSHOP,,} == true ]]; then
     fi
 
     if [[ $WORKSHOP_DELTA_NEW_COUNT -gt 0 || $WORKSHOP_DELTA_MODIFY_COUNT -gt 0 ]]; then
+        STEAMCMD_PREPARE
         WORKSHOP_ALL=$(echo "$WORKSHOP_DELTA_JSON" | jq --raw-output '.NEW+.MODIFY | [.[].publishedfileid] | join(",")')
         WORKSHOP_ALL_COUNT=$(echo $WORKSHOP_ALL, | tr -cd "," | wc -c)
         echo "  🔧 $WORKSHOP_ALL_COUNT item(s) to download."
@@ -424,7 +415,7 @@ if [[ ${UPDATE_WORKSHOP,,} == true ]]; then
                 # This will loop 1+WORKSHOP_MAX_RETRY times.
                 for ((LOOP_TEMP_WORKSHOP_RETRY = 0 ; LOOP_TEMP_WORKSHOP_RETRY <= WORKSHOP_MAX_RETRY ; LOOP_TEMP_WORKSHOP_RETRY++ )); do
                     rm -f "${HOME}/Steam/logs/workshop_log.txt"
-                    STEAMCMD_RUN $STEAM_SCRIPT_BASE +login anonymous $LOOP_TMP_WORKSHOP_SCRIPT +quit
+                    STEAMCMD_RUN $WORKSHOP_SCRIPT_BASE +login anonymous $LOOP_TMP_WORKSHOP_SCRIPT +quit
                     # Check if this group is downloaded successfully, mark down the unsuccessful ones.
                     LOOP_TEMP_WORKSHOP_SUCCESS=1
                     for LOOP_TMP_WORKSHOP_ID_ITEM in ${LOOP_TMP_WORKSHOP_ID//,/ }; do
