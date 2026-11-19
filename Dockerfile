@@ -141,7 +141,8 @@ RUN cd /output/openstarbound/linux && \
 
 FROM base AS final
 
-RUN mkdir -m 755 -p ${DIR_DATA_ROOT}/steam/home ${DIR_SERVER_ROOT}/osb && \
+RUN rm -f /etc/apt/apt.conf.d/01proxy && \
+    mkdir -m 755 -p ${DIR_DATA_ROOT}/steam/home ${DIR_SERVER_ROOT}/osb && \
     groupadd -g 1000 steam && \
     useradd -u 1000 -g steam -d ${DIR_DATA_ROOT}/steam/home steam && \
     chown -R steam:steam ${DIR_DATA_ROOT} ${DIR_SERVER_ROOT}
