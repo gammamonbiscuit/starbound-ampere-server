@@ -475,7 +475,7 @@ fi
 if [[ ${LAUNCH_GAME,,} == true ]]; then
     {
     echo "  🔧 Removing old symlinks..."
-    find ${DIR_DATA_ROOT}/mods/workshop-* -xtype l -delete
+    find "${DIR_DATA_ROOT}/mods" -path "${DIR_DATA_ROOT}/mods/workshop-*" -xtype l -delete
     if [[ -d "${DIR_WORKSHOP_CONTENT}" ]]; then
         echo "  🔧 Recreating workshop symlinks..."
         # Extract parts from .pak path
