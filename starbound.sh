@@ -15,6 +15,14 @@ PATH_CONFIG_SBINIT="${DIR_DATA_ROOT}/config/sbinit.config"
 PATH_CONFIG_WS="${DIR_DATA_ROOT}/config/workshop_data.json"
 PATH_LOG="${DIR_DATA_ROOT}/container.log"
 
+CONTAINER_HALT() {
+    trap "exit 0" SIGINT
+    echo "⏸️ HALT: $*"
+    while true; do
+        sleep 1
+    done
+}
+
 CONTAINER_ABORT() {
     echo "❌ ABORT: $*" >&2
     exit 1
@@ -256,12 +264,6 @@ if [[ ${UPDATE_RETAIL_ASSET,,} == true ]]; then
     fi
 fi
 
-if [[ ${LAUNCH_GAME,,} == true && ! -f "${DIR_DATA_ROOT}/asset/packed.pak" ]]; then
-    LAUNCH_GAME=false
-    echo "❌ packed.pak is missing from ${DIR_DATA_ROOT}/asset, fallback to setup-only mode (LAUNCH_GAME=false)."
-    sleep 15
-fi
-
 if [[ ${UPDATE_WORKSHOP,,} == true ]]; then
     echo "⚙️ Workshop content update enabled."
     WORKSHOP_SCRIPT_BASE="+@NoPromptForPassword 1 +@sSteamCmdForcePlatformType linux +@sSteamCmdForcePlatformBitness 64 +force_install_dir ${DIR_WORKSHOP_ROOT}"
@@ -468,25 +470,28 @@ fi
 
 if [[ ${LAUNCH_GAME,,} == true ]]; then
     {
-    echo "  🔧 Removing old symlinks..."
-    find "${DIR_DATA_ROOT}/mods" -path "${DIR_DATA_ROOT}/mods/workshop-*" -xtype l -delete
-    if [[ -d "${DIR_WORKSHOP_CONTENT}" ]]; then
-        echo "  🔧 Recreating workshop symlinks..."
-        # Extract parts from .pak path
-        # /data/steam/steamapps/workshop/content/211820/123456789/foobar.pak
-        # (\1                                                              )
-        #                                               (\2     ) (\3      )
-        # Use the parts to create the link's path
-        # /data/mods/workshop-123456789-foobar.pak
-        #                     (\2     ) (\3      )
-        # And then just create symlink with ln -r and both full paths, let ln to handle relative paths and have less regex madless lol
-        find "${DIR_WORKSHOP_CONTENT}" -type f -name "*.pak" | sed -r "s#^(.*/211820/([0-9]+)/(.*))\$#\"\1\" \"${DIR_DATA_ROOT}/mods/workshop-\2-\3\"#" | xargs -r -n2 ln -vfsr
+    if [[ ! -f "${DIR_DATA_ROOT}/asset/packed.pak" ]]; then
+        CONTAINER_HALT "packed.pak is missing from ${DIR_DATA_ROOT}/asset, and UPDATE_RETAIL_ASSET is not enabled. Please install packed.pak and restart the container."
+    else
+        echo "  🔧 Removing old symlinks..."
+        find "${DIR_DATA_ROOT}/mods" -path "${DIR_DATA_ROOT}/mods/workshop-*" -xtype l -delete
+        if [[ -d "${DIR_WORKSHOP_CONTENT}" ]]; then
+            echo "  🔧 Recreating workshop symlinks..."
+            # Extract parts from .pak path
+            # /data/steam/steamapps/workshop/content/211820/123456789/foobar.pak
+            # (\1                                                              )
+            #                                               (\2     ) (\3      )
+            # Use the parts to create the link's path
+            # /data/mods/workshop-123456789-foobar.pak
+            #                     (\2     ) (\3      )
+            # And then just create symlink with ln -r and both full paths, let ln to handle relative paths and have less regex madless lol
+            find "${DIR_WORKSHOP_CONTENT}" -type f -name "*.pak" | sed -r "s#^(.*/211820/([0-9]+)/(.*))\$#\"\1\" \"${DIR_DATA_ROOT}/mods/workshop-\2-\3\"#" | xargs -r -n2 ln -vfsr
+        fi
+        echo "🎮 Launching Starbound..."
     fi
-    echo "🎮 Launching Starbound..."
     } > >(tee -a "$PATH_LOG") 2>&1
     exec "${DIR_SERVER_ROOT}/osb/linux/starbound_server" -bootconfig "${PATH_CONFIG_SBINIT}"
 else
-    echo "👋 Adios"
     # Uncomment to keep the container alive for debugging
-    #sleep infinity
+    #CONTAINER_HALT "LAUNCH_GAME is not enabled."
 fi
