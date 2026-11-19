@@ -242,13 +242,16 @@ if [[ ${UPDATE_RETAIL_ASSET,,} == true ]]; then
         STEAMCMD_VERBOSE=true
         STEAMCMD_RUN +login $STEAM_LOGIN +download_depot 533830 533831 2755498507246012069 +quit
         STEAMCMD_VERBOSE=false
+        if [[ ! -f "${PATH_RETAIL_ASSET}" ]]; then
+            CONTAINER_ABORT "Unable to download Starbound asset, file not found..."
+        fi
         if echo "${HASH_RETAIL_ASSET} ${PATH_RETAIL_ASSET}" | sha256sum --check --status; then
             cp -fv "${PATH_RETAIL_ASSET}" "${DIR_DATA_ROOT}/asset/packed.pak"
             echo "  ✔️ Download finished."
         else
             echo "  ❌ Hash mismatch: $(sha256sum "${PATH_RETAIL_ASSET}")"
             echo "  ❌ Expect ${HASH_RETAIL_ASSET}"
-            CONTAINER_ABORT "Unable to download Starbound asset..."
+            CONTAINER_ABORT "Unable to download Starbound asset, file corrupted..."
         fi
     fi
 fi
