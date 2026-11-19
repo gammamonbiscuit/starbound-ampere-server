@@ -467,6 +467,7 @@ else
 fi
 
 } > >(tee -a "$PATH_LOG") 2>&1
+wait
 
 if [[ ${LAUNCH_GAME,,} == true ]]; then
     {
@@ -490,6 +491,7 @@ if [[ ${LAUNCH_GAME,,} == true ]]; then
         echo "🎮 Launching Starbound..."
     fi
     } > >(tee -a "$PATH_LOG") 2>&1
+    wait
     exec "${DIR_SERVER_ROOT}/osb/linux/starbound_server" -bootconfig "${PATH_CONFIG_SBINIT}"
 else
     # Uncomment to keep the container alive for debugging
