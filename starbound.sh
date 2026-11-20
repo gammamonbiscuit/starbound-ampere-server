@@ -348,7 +348,6 @@ if [[ ${UPDATE_WORKSHOP,,} == true ]]; then
     WORKSHOP_CURRENT_IDS=$(echo "$WORKSHOP_CURRENT_JSON" | jq --raw-output '.[].publishedfileid')
     WORKSHOP_CURRENT_MISMATCH=()
 
-    shopt -s nullglob
     for DIR in "${DIR_WORKSHOP_CONTENT}"/*/; do
         ID=${DIR%/}
         ID=${ID##*/}
@@ -358,17 +357,13 @@ if [[ ${UPDATE_WORKSHOP,,} == true ]]; then
             continue
         fi
         RECORDED=$(echo "$WORKSHOP_CURRENT_JSON" | jq --arg ID "$ID" --raw-output '.[] | select(.publishedfileid == $ID) | .file_size // 0')
-        SIZE=0
-        for PAK in "${DIR}"*.pak; do
-            ((SIZE += $(stat -c%s "${PAK}")))
-        done
+        SIZE=$(du -bs "${DIR}" | cut -f1)
         if [[ "$SIZE" -ne "$RECORDED" ]]; then
             echo "      ⚠️ ${ID}: Size mismatch (disk ${SIZE}, record ${RECORDED})."
             rm -rfv "${DIR}"
             WORKSHOP_CURRENT_MISMATCH+=("${ID}")
         fi
     done
-    shopt -u nullglob
 
     for ID in $WORKSHOP_CURRENT_IDS; do
         if [[ ! -d "${DIR_WORKSHOP_CONTENT}/${ID}" ]]; then
