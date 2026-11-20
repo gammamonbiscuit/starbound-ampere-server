@@ -15,6 +15,9 @@ PATH_CONFIG_SBINIT="${DIR_DATA_ROOT}/config/sbinit.config"
 PATH_CONFIG_WS="${DIR_DATA_ROOT}/config/workshop_data.json"
 PATH_LOG="${DIR_DATA_ROOT}/container.log"
 
+CONTAINER_ABORT_RECORD="${DIR_SERVER_ROOT}/abort.log"
+CONTAINER_ABORT_MAX=3
+
 CONTAINER_HALT() {
     trap "exit 0" SIGINT
     echo "⏸️ HALT: $*"
@@ -24,7 +27,20 @@ CONTAINER_HALT() {
 }
 
 CONTAINER_ABORT() {
-    echo "❌ ABORT: $*" >&2
+    CONTAINER_ABORT_COUNT=0
+    if [[ -f "$CONTAINER_ABORT_RECORD" ]]; then
+        CONTAINER_ABORT_COUNT=$(<"${CONTAINER_ABORT_RECORD}")
+        if [[ ! $CONTAINER_ABORT_COUNT =~ ^[0-9]+$ ]]; then
+            CONTAINER_ABORT_COUNT=0
+        fi
+    fi
+    ((CONTAINER_ABORT_COUNT++))
+    echo "❌ ABORT (${CONTAINER_ABORT_COUNT}/${CONTAINER_ABORT_MAX}): $*" >&2
+    echo "${CONTAINER_ABORT_COUNT}" > "${CONTAINER_ABORT_RECORD}"
+    if [[ $CONTAINER_ABORT_COUNT -ge $CONTAINER_ABORT_MAX ]]; then
+        rm -f "${CONTAINER_ABORT_RECORD}"
+        CONTAINER_HALT "Failing too much, manual restart required."
+    fi
     exit 1
 }
 
@@ -472,6 +488,7 @@ wait
 if [[ ${LAUNCH_GAME,,} == true ]]; then
     {
     if [[ ! -f "${DIR_DATA_ROOT}/asset/packed.pak" ]]; then
+        rm -f "${CONTAINER_ABORT_RECORD}"
         CONTAINER_HALT "packed.pak is missing from ${DIR_DATA_ROOT}/asset, and UPDATE_RETAIL_ASSET is not enabled. Please install packed.pak and restart the container."
     else
         echo "  🔧 Removing old symlinks..."
@@ -492,8 +509,22 @@ if [[ ${LAUNCH_GAME,,} == true ]]; then
     fi
     } > >(tee -a "$PATH_LOG") 2>&1
     wait
-    exec "${DIR_SERVER_ROOT}/osb/linux/starbound_server" -bootconfig "${PATH_CONFIG_SBINIT}"
+    set -m
+    "${DIR_SERVER_ROOT}/osb/linux/starbound_server" -bootconfig "${PATH_CONFIG_SBINIT}" &
+    GAME_PID=$!
+    GAME_STATUS=0
+    trap "kill -SIGINT ${GAME_PID}" SIGINT
+    while kill -0 "${GAME_PID}" 2>/dev/null; do
+        wait "${GAME_PID}"
+        GAME_STATUS=$?
+    done
+    if [[ $GAME_STATUS -ne 0 ]]; then
+        CONTAINER_ABORT "Starbound exited with status ${GAME_STATUS}."
+    fi
+    rm -f "${CONTAINER_ABORT_RECORD}"
+    exit 0
 else
+    rm -f "${CONTAINER_ABORT_RECORD}"
     # Uncomment to keep the container alive for debugging
     #CONTAINER_HALT "LAUNCH_GAME is not enabled."
 fi
