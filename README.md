@@ -2,9 +2,6 @@
 This is my attempt on running Starbound dedicated server in an Oracle Ampere A1 Compute instance.
 
 >[!WARNING]
->This project is having major ongoing changes, contents in this README are outdated.
-
->[!WARNING]
 >No docker image is available for download, you have to build it yourself,
 >I made this only to let myself host Starbound in this very specific instance and play with my friends,
 >I **do not** guarantee that this will work on your machine.
@@ -43,7 +40,7 @@ docker build -t starbound-ampere-server:local .
 ```
 
 >[!NOTE]
->This will build box64 from source and might take some time. For OpenStarbound, version `0.1.15` and onwards are already native arm64, so unless you want an old version, the script will just download the release build from github. Compile time is about half an hour on my 4-core VM.Standard.A1.Flex instance, or 15-20 minutes on Apple M4 depending on how fast I can download vcpkg.
+>When building in an arm64 environment, this will build box64 from source and might take some time. For OpenStarbound, version `0.1.15` and onwards are already native arm64, so unless you want an old version, the script will just download the release build from github. Compile time is about half an hour on my 4-core VM.Standard.A1.Flex instance, or 15-20 minutes on Apple M4 depending on how fast I can download vcpkg.
 
 4. Optional: Copy the example configs
 ```bash
@@ -52,7 +49,8 @@ cp ./data/config/sbinit.config.example ./data/config/sbinit.config
 ```
 
 5. Get your packed.pak
-<br />Check the [Steam Guard and packed.pak](#steam-guard-and-packedpak) section.
+
+   Check the [Steam Guard and packed.pak](#steam-guard-and-packedpak) section.
 
 6. Start the server
 ```bash
@@ -88,7 +86,8 @@ The [compose.yml](/compose.yml) example only mounts the user serviceable `/data`
 
 /server
 ├── osb                              # OpenStarbound binaries
-└── starbound.sh                     # Main script
+├── starbound.sh                     # Main script
+└── abort.log                        # Abort counting log, created on abort, running the container in read only mode breaks this
 ```
 
 ## Steam Guard and packed.pak
