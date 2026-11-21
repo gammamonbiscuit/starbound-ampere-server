@@ -41,6 +41,7 @@ CONTAINER_ABORT() {
         rm -f "${CONTAINER_ABORT_RECORD}"
         CONTAINER_HALT "Failing too much, manual restart required."
     fi
+    sleep 0.5 # Yeah, this gives time for tee to write
     exit 1
 }
 
@@ -73,6 +74,7 @@ for LOOP_DATA_DIRECTORIES in "${DATA_DIRECTORIES[@]}"; do
 done
 
 echo "🚧 Logging started" | tee "$PATH_LOG"
+exec 3>&1 4>&2
 {
 if [[ ! -f "${PATH_CONFIG_ENV}" ]]; then
     echo "🚧 Creating config file..."
@@ -477,11 +479,7 @@ else
     echo "⚙️ Workshop content update disabled."
 fi
 
-} > >(tee -a "$PATH_LOG") 2>&1
-wait
-
 if [[ ${LAUNCH_GAME,,} == true ]]; then
-    {
     if [[ ! -f "${DIR_DATA_ROOT}/asset/packed.pak" ]]; then
         rm -f "${CONTAINER_ABORT_RECORD}"
         CONTAINER_HALT "packed.pak is missing from ${DIR_DATA_ROOT}/asset, and UPDATE_RETAIL_ASSET is not enabled. Please install packed.pak and restart the container."
@@ -502,10 +500,8 @@ if [[ ${LAUNCH_GAME,,} == true ]]; then
         fi
         echo "🎮 Launching Starbound..."
     fi
-    } > >(tee -a "$PATH_LOG") 2>&1
-    wait
     set -m
-    "${DIR_SERVER_ROOT}/osb/linux/starbound_server" -bootconfig "${PATH_CONFIG_SBINIT}" &
+    "${DIR_SERVER_ROOT}/osb/linux/starbound_server" -bootconfig "${PATH_CONFIG_SBINIT}" >&3 2>&4 &
     GAME_PID=$!
     GAME_STATUS=0
     trap "kill -SIGINT ${GAME_PID}" SIGINT
@@ -517,9 +513,9 @@ if [[ ${LAUNCH_GAME,,} == true ]]; then
         CONTAINER_ABORT "Starbound exited with status ${GAME_STATUS}."
     fi
     rm -f "${CONTAINER_ABORT_RECORD}"
-    exit 0
 else
     rm -f "${CONTAINER_ABORT_RECORD}"
     # Uncomment to keep the container alive for debugging
     #CONTAINER_HALT "LAUNCH_GAME is not enabled."
 fi
+} > >(tee -a "$PATH_LOG") 2>&1
