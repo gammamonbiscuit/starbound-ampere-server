@@ -1,5 +1,5 @@
 # Starbound Ampere Server
-This is my attempt on running Starbound dedicated server in an Oracle Ampere A1 Compute instance.
+This is my attempt on running Starbound dedicated server in an Oracle Ampere A1 Compute instance, it also works in x86.
 
 >[!WARNING]
 >No docker image is available for download, you have to build it yourself,
@@ -25,8 +25,12 @@ This is my attempt on running Starbound dedicated server in an Oracle Ampere A1 
      - Able to keep multiple versions, what if this is combined with some external script handling auto server restart...
 
 ## How to run a server
-1. Clone this repo
+1. Clone this repo (choose one)
 ```bash
+# The current stable release v1.0.0 (recommended)
+git clone --branch v1.0.0 https://github.com/gammamonbiscuit/starbound-ampere-server.git
+
+# The latest code, could be unstable or broken
 git clone https://github.com/gammamonbiscuit/starbound-ampere-server.git
 ```
 2. Go into the repo's directory
@@ -92,7 +96,7 @@ The [compose.yml](/compose.yml) example only mounts the user serviceable `/data`
 
 ## Steam Guard and packed.pak
 ### Manual setup (recommended)
-With OpenStarbound being the default game engine used in this image, you do not need to login to Steam to download vanilla Starbound, but the `packed.pak` that comes with it is still a problem. To solve this you can use the `packed.pak` from the Starbound copy you own, put `packed.pak` in `/data/asset` to eliminate the need of Steam login.
+With OpenStarbound being the default game engine used in this image, you do not need to login to Steam to download retail Starbound, but the `packed.pak` that comes with it is still a problem. To solve this you can use the `packed.pak` from the Starbound copy you own, put `packed.pak` in `/data/asset` to eliminate the need of Steam login.
 
 It can be found in the following locations, it is recommended to copy from dedicated server, it contains the minimal needed files for server to operate.
 
